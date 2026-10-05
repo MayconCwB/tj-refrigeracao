@@ -236,6 +236,34 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','orcamentoNum','atualizadoEm']);
       allow delete: if owner();
     }
+    function validReceipt(d, id) {
+      return d.keys().hasAll(['numero','clienteUid','clienteNome','documento','endereco','chamadoNum','equipamento','descricao','valorCentavos','dataPagamento','pagamento','observacoes','empresa','emitidoPor','status','criadoEm'])
+        && d.keys().hasOnly(['numero','clienteUid','clienteNome','documento','endereco','chamadoNum','equipamento','descricao','valorCentavos','dataPagamento','pagamento','observacoes','empresa','emitidoPor','status','criadoEm','canceladoEm','canceladoPor','motivoCancelamento'])
+        && text(d.numero,80) && d.numero == 'REC-'+id
+        && text(d.clienteUid,128) && d.clienteUid.size()>0 && text(d.clienteNome,200) && d.clienteNome.size()>0
+        && text(d.documento,40) && text(d.endereco,500) && text(d.chamadoNum,40) && text(d.equipamento,200)
+        && text(d.descricao,5000) && d.descricao.size()>0 && text(d.observacoes,2000)
+        && d.valorCentavos is int && d.valorCentavos>0 && d.valorCentavos<=99999999
+        && d.dataPagamento is string && d.dataPagamento.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && d.pagamento in ['Pix','Dinheiro','Cartão de crédito','Cartão de débito','Transferência','Outro']
+        && d.empresa is map && d.empresa.keys().hasAll(['nome','cnpj','telefone','email']) && d.empresa.keys().hasOnly(['nome','cnpj','telefone','email'])
+        && text(d.empresa.nome,200) && d.empresa.nome.size()>0 && text(d.empresa.cnpj,40) && text(d.empresa.telefone,40) && text(d.empresa.email,254)
+        && text(d.emitidoPor,128) && d.criadoEm is timestamp
+        && (d.status=='Emitido' ? !d.keys().hasAny(['canceladoEm','canceladoPor','motivoCancelamento'])
+          : (d.status=='Cancelado' && d.canceladoEm is timestamp && text(d.canceladoPor,128) && text(d.motivoCancelamento,500) && d.motivoCancelamento.size()>0));
+    }
+    match /recibos/{id} {
+      allow read: if owner();
+      allow create: if owner() && validReceipt(request.resource.data,id)
+        && request.resource.data.status=='Emitido' && request.resource.data.emitidoPor==request.auth.uid
+        && request.resource.data.criadoEm==request.time && active(request.resource.data.clienteUid)
+        && (request.resource.data.chamadoNum=='' || request.resource.data.chamadoNum in get(/databases/$(database)/documents/clientData/$(request.resource.data.clienteUid)).data.get('chamadoIds',[]));
+      allow update: if owner() && validReceipt(request.resource.data,id)
+        && resource.data.status=='Emitido' && request.resource.data.status=='Cancelado'
+        && request.resource.data.canceladoPor==request.auth.uid && request.resource.data.canceladoEm==request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','canceladoEm','canceladoPor','motivoCancelamento']);
+      allow delete: if false;
+    }
     match /{document=**} { allow read,write: if false; }
   }
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v38-deslocamento';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v39-recibos';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
@@ -10,6 +10,7 @@ const APP_SHELL = [
   './assets/tj-deslocamento.js',
   './assets/tj-media-config.js',
   './assets/tj-chamado-media.js',
+  './assets/tj-recibos.js',
   './assets/tj-cliente-acompanhamento.js',
   './manifest.webmanifest',
   './assets/tj-logo.png',
