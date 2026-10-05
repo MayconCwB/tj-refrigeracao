@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v44-fluxo-orcamento';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v45-chamado-orcamento';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',

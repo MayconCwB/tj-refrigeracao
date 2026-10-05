@@ -8069,6 +8069,7 @@ function preencherOrcChamado(uid,selected){
   if(selected)sel.value=String(selected);
 }
 function abrirFormChamado(obj, uidPreferido){
+  document.getElementById('tj-call-budget-summary')?.remove();
   var uid=uidPreferido||uidRegistro(obj)||((clientesV13()[0]||{}).uid||'');
   preencherSelectClientes('admin-chamado-cliente',uid);
   preencherEquipChamado(uid,obj&&obj.equip);
@@ -8088,6 +8089,25 @@ function abrirFormChamado(obj, uidPreferido){
   $v('admin-chamado-obs').value=(obj&&obj.observacoes)||'';
   abrirTela('tela-emp-form-chamado');
 }
+window.TJCallFromBudget=async function(uid,number){
+  if(!ownerOk())return;
+  var actorUid=window.TJFB.auth.currentUser.uid,doc=await window.TJFB.db.collection('clientData').doc(uid).get();
+  if(!ownerOk()||window.TJFB.auth.currentUser.uid!==actorUid)return;
+  var data=doc.exists?doc.data():{},matches=(data.orcamentos||[]).filter(function(q){return String(q.num)===String(number);});
+  if(matches.length!==1||matches[0].status!=='Aprovado'||matches[0].clienteUid&&matches[0].clienteUid!==uid)throw Error('O orçamento precisa estar aprovado para este cliente. Atualize a lista.');
+  var q=matches[0],linked=(data.chamados||[]).filter(function(c){return String(c.orcamentoNum||'')===String(number)||q.chamado&&String(c.num)===String(q.chamado)||(data.agendamentos||[]).some(function(a){return String(a.orcamentoNum||'')===String(number)&&String(a.chamado||'')===String(c.num);});});
+  if(linked.length){await recarregarV13();chamadoAtualNum=String(linked[0].num);abrirTela('tela-emp-atendimento');avisoV13('Este orçamento já possui um chamado vinculado.');return;}
+  await recarregarV13();if(!ownerOk()||window.TJFB.auth.currentUser.uid!==actorUid)return;
+  abrirFormChamado(null,uid);$v('admin-chamado-orcamento').value=String(number);$v('admin-chamado-problema').value=q.servico||'';
+  var schedule=(data.agendamentos||[]).find(function(a){return String(a.orcamentoNum||'')===String(number);});
+  if(schedule){$v('admin-chamado-data').value=schedule.data||'';$v('admin-chamado-hora').value=schedule.hora||'';$v('admin-chamado-endereco').value=schedule.local||'';}
+  var summary=$v('tj-call-budget-summary');if(!summary){summary=document.createElement('div');summary.id='tj-call-budget-summary';summary.className='card-box';$v('admin-chamado-orcamento').parentNode.after(summary);}
+  summary.replaceChildren();var title=document.createElement('strong');title.textContent='Orçamento aprovado #'+q.num+' — '+formatarMoedaBR(q.total);summary.append(title);
+  normalizarItensOrcamento(q.itens).forEach(function(i){var row=document.createElement('p');row.textContent=i.descricao+' • Quantidade: '+i.qtd+' • Valor unitário: '+formatarMoedaBR(i.valor);summary.append(row);});
+  var note=document.createElement('p');note.textContent='Os itens e valores aprovados ficarão vinculados ao chamado. Registre as peças efetivamente utilizadas durante o atendimento.';summary.append(note);
+  await preencherEquipChamado(uid,q.equip||q.equipamentoNome||'');
+  if(ownerOk()&&window.TJFB.auth.currentUser.uid===actorUid&&$v('admin-chamado-cliente').value===uid){var equipment=$v('admin-chamado-equip');if(!equipment.value&&equipment.options.length===2)equipment.selectedIndex=1;}
+};
 async function salvarChamado(){
   if(!ownerOk())return avisoV13('Acesso restrito ao proprietário.');
   try{window.TJMedia?.validateOwnerDraft();}catch(e){return avisoV13(e.message);}
@@ -8305,7 +8325,7 @@ document.addEventListener('keydown',function(ev){
 },true);
 
 // Atualiza equipamentos do formulário de chamado quando o cliente muda.
-document.addEventListener('change',function(ev){if(ev.target&&ev.target.id==='admin-chamado-cliente'){preencherEquipChamado(ev.target.value,'');preencherOrcChamado(ev.target.value,'');}},true);
+document.addEventListener('change',function(ev){if(ev.target?.id==='admin-chamado-orcamento')document.getElementById('tj-call-budget-summary')?.remove();if(ev.target&&ev.target.id==='admin-chamado-cliente'){preencherEquipChamado(ev.target.value,'');preencherOrcChamado(ev.target.value,'');document.getElementById('tj-call-budget-summary')?.remove();}},true);
 
 // Ao abrir cadastro novo, restaura o modo criação.
 document.addEventListener('click',function(ev){var a=ev.target&&ev.target.closest?ev.target.closest('[data-action="abrir-novo-cliente-empresa"]'):null;if(!a)return;resetFormCliente();},true);
@@ -8634,7 +8654,7 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
     normalizarControles();
     var drawer=document.querySelector('.drawer-panel,.side-drawer,.sidebar');
     var antigo=drawer&&drawer.querySelector('.tj-v25-version');if(antigo)antigo.remove();
-    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v44';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
+    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v45';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
   });
   var obs=new MutationObserver(normalizarControles);document.addEventListener('DOMContentLoaded',function(){if(document.body)obs.observe(document.body,{childList:true,subtree:true});});
 })();

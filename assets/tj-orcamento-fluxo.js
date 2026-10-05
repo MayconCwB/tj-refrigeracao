@@ -14,13 +14,20 @@
     b.addEventListener('click', () => open(budget));
     return b;
   }
+  function callButton(budget) {
+    const b=document.createElement('button');b.type='button';b.className='btn-tj';
+    const linked=(state.chamados||[]).some(c=>c.clienteUid===budget.clienteUid&&(String(c.orcamentoNum||'')===String(budget.num)||budget.chamado&&String(c.num)===String(budget.chamado)||(state.agendamentos||[]).some(a=>a.clienteUid===budget.clienteUid&&String(a.orcamentoNum||'')===String(budget.num)&&String(a.chamado||'')===String(c.num))));
+    b.textContent=linked?'Abrir chamado':'Criar chamado';b.dataset.tjBudgetCall=String(budget.num);
+    b.onclick=async()=>{if(b.disabled)return;b.disabled=true;try{const uid=uidFor(budget);if(!uid)throw Error('Cliente do orçamento não identificado.');await window.TJCallFromBudget(uid,budget.num);}catch(e){toast(e.message||'Não foi possível abrir o chamado.');}finally{b.disabled=false;}};
+    return b;
+  }
   const renderList = renderizarOrcamentosEmpresa;
   renderizarOrcamentosEmpresa = function () {
     const result = renderList.apply(this, arguments);
-    if (owner()) document.querySelectorAll('#lista-emp-orcamentos .admin-record').forEach(card => {
+    if (owner()) document.querySelectorAll('#lista-emp-orcamentos .admin-record').forEach((card,index) => {
       const ref = card.querySelector('[data-action="abrir-orc"]');
-      const budget = (state.orcamentos || []).find(o => ref && String(o.num) === ref.dataset.id);
-      if (budget && budget.status === 'Aprovado') card.querySelector('.admin-card-actions').appendChild(button(budget));
+      const budget = (state.orcamentos || [])[index];
+      if (ref && budget && String(budget.num)===ref.dataset.id && budget.status === 'Aprovado') card.querySelector('.admin-card-actions').append(button(budget),callButton(budget));
     });
     return result;
   };
@@ -29,7 +36,7 @@
     const result = renderDetail.apply(this, arguments);
     const actions = document.getElementById('det-orc-acoes-aprovacao');
     const budget = (state.orcamentos || []).find(o => String(o.num) === String(orcamentoAtualNum));
-    if (actions && owner() && budget && budget.status === 'Aprovado') actions.appendChild(button(budget));
+    if (actions && owner() && budget && budget.status === 'Aprovado' && (state.orcamentos||[]).filter(o=>String(o.num)===String(orcamentoAtualNum)).length===1) actions.append(button(budget),callButton(budget));
     return result;
   };
   const style = document.createElement('style');
