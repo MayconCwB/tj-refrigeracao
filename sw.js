@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v36-acompanhamento';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v37-pecas-atendimento';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
@@ -6,6 +6,7 @@ const APP_SHELL = [
   './assets/tj-orcamento-fluxo.js',
   './assets/tj-cadastros.js',
   './assets/tj-atendimento.js',
+  './assets/tj-atendimento-pecas.js',
   './assets/tj-cliente-acompanhamento.js',
   './manifest.webmanifest',
   './assets/tj-logo.png',
