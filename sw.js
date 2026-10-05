@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v42-financeiro';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v42-financeiro-compat';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',

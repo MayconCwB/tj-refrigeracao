@@ -36,7 +36,7 @@
     if(token!==generation||!owner()||fb().auth.currentUser.uid!==uid)return;
     snapshot={customers:customers.docs.map(d=>({id:d.id,data:d.data()})),receipts:receipts.docs.map(d=>({...d.data(),id:d.id})),links:links.docs.map(d=>({...d.data(),id:d.id}))};
     status.textContent='Atualizado em '+new Date().toLocaleString('pt-BR')+' • Todos os registros';render();
-  }catch(e){if(token===generation&&owner()){clear();status.textContent='Não foi possível carregar o financeiro. Confira a conexão e toque em Atualizar financeiro.';}}finally{if(token===generation)loading=false;}}
+  }catch(e){if(token===generation&&owner()){clear();status.textContent=e.code==='permission-denied'?'Financeiro aguardando ativação das permissões no Firebase.':'Não foi possível carregar o financeiro. Confira a conexão e toque em Atualizar financeiro.';}}finally{if(token===generation)loading=false;}}
   function render(){if(!snapshot||!owner())return;const report=window.TJFinanceCore.calculate(snapshot.customers,snapshot.receipts,snapshot.links),query=$('tj-finance-search').value.trim().toLocaleLowerCase('pt-BR'),filter=$('tj-finance-filter').value;
     const summary=$('tj-finance-summary');summary.replaceChildren();for(const [label,value]of [['Recebido',money(report.received)],['Saldo confirmado a receber',money(report.pending)],['Recebimentos / registros a conferir',String(report.reviewCount)]]){const card=document.createElement('div');card.className='kpi-card';card.append(text('p',label,'kpi-tag'),text('strong',value,'kpi-num'));summary.append(card);}
     const unlinked=$('tj-finance-unlinked');unlinked.replaceChildren();if(report.issues.length)unlinked.append(text('p','Há registros com valores ou vínculos inconsistentes. Confira os dados antes de considerar o saldo.'));
