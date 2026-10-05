@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v41-telas-fixas';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v42-financeiro';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
@@ -12,6 +12,7 @@ const APP_SHELL = [
   './assets/tj-chamado-media.js',
   './assets/tj-recibos.js',
   './assets/tj-layout.js',
+  './assets/tj-financeiro.js',
   './assets/tj-cliente-acompanhamento.js',
   './manifest.webmanifest',
   './assets/tj-logo.png',

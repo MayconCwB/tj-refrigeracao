@@ -264,6 +264,26 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','canceladoEm','canceladoPor','motivoCancelamento']);
       allow delete: if false;
     }
+    // vinculosFinanceiros/{receiptId}: owner-managed allocation of an immutable receipt.
+    // Required strings: reciboId (200), clienteUid (128), orcamentoNum (40),
+    // atualizadoPor (authenticated owner UID); atualizadoEm is the request timestamp.
+    function validFinanceLink(d, id) {
+      return d.keys().hasAll(['reciboId','clienteUid','orcamentoNum','atualizadoPor','atualizadoEm'])
+        && d.keys().hasOnly(['reciboId','clienteUid','orcamentoNum','atualizadoPor','atualizadoEm'])
+        && text(d.reciboId,200) && d.reciboId == id
+        && text(d.clienteUid,128) && d.clienteUid.size()>0
+        && text(d.orcamentoNum,40) && d.orcamentoNum.size()>0
+        && d.atualizadoPor == request.auth.uid && d.atualizadoEm == request.time
+        && getAfter(/databases/$(database)/documents/recibos/$(id)).data.clienteUid == d.clienteUid
+        && getAfter(/databases/$(database)/documents/recibos/$(id)).data.status == 'Emitido';
+    }
+    match /vinculosFinanceiros/{id} {
+      allow read: if owner();
+      allow create: if owner() && validFinanceLink(request.resource.data,id);
+      allow update: if owner() && validFinanceLink(request.resource.data,id)
+        && request.resource.data.clienteUid == resource.data.clienteUid;
+      allow delete: if owner();
+    }
     match /{document=**} { allow read,write: if false; }
   }
 }
