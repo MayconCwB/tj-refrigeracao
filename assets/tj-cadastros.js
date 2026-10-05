@@ -88,11 +88,13 @@
     d.form.append(button('Adicionar serviço / item',()=>addItem(),'btn-tj-secondary'));addItem('Serviço');
     loadParts().then(()=>parts.filter(p=>p.ativo).forEach(p=>catalog.append(new Option(p.nome+' — '+money(p.precoCentavos),p.id)))).catch(()=>{});
     catalog.addEventListener('change',()=>{const p=parts.find(p=>p.id===catalog.value);if(p)addItem(p.nome,decimal(p.precoCentavos));catalog.value='';});
+    const travelKm=d.field('deslocamentoKm','Deslocamento previsto: quilômetros (ida e volta)','text','0'),travelRate=d.field('deslocamentoValorKm','Cobrança de deslocamento: valor por km (R$)','text','0,00');
     d.save.textContent='Enviar orçamento ao cliente';
     d.finish(async()=>{
       if(!actor()||!isOwner())throw new Error('Sua sessão mudou. Entre novamente.');
       if(!items.length||!desc.value.trim())throw new Error('Informe o serviço e pelo menos um item.');
       let total=0;const quoteItems=items.map(i=>{const qty=Number(i.qty.value),price=cents(i.value.value);if(!i.text.value.trim()||!Number.isInteger(qty)||qty<1||qty>10000)throw new Error('Confira descrição e quantidade dos itens.');total+=qty*price;return {descricao:i.text.value.trim(),qtd:String(qty),valor:decimal(price)};});if(total>99999999)throw new Error('Total acima do limite permitido.');
+      const kilometers=window.TJTravel.parseKm(travelKm.value||'0'),rate=cents(travelRate.value||'0,00'),travelTotal=Math.round(kilometers*rate);if(rate>0&&kilometers===0)throw new Error('Informe os quilômetros para cobrar deslocamento.');if(travelTotal>0){total+=travelTotal;quoteItems.push({descricao:'Deslocamento — '+kilometers.toLocaleString('pt-BR')+' km (ida e volta) × '+money(rate)+'/km',qtd:'1',valor:decimal(travelTotal)});}if(total>99999999)throw new Error('Total acima do limite permitido.');
       const user=actor(),db=fb().db,reqRef=db.collection('solicitacoesOrcamento').doc(r.id),dataRef=db.collection('clientData').doc(r.clienteUid),date=new Date().toLocaleDateString('pt-BR');
       await db.runTransaction(async tx=>{
         const profile=await tx.get(db.collection('users').doc(user.uid)),customer=await tx.get(db.collection('users').doc(r.clienteUid)),request=await tx.get(reqRef),data=await tx.get(dataRef);
@@ -129,7 +131,7 @@
     const retired=['tela-emp-pedidos','tela-emp-form-pedido','tela-emp-pedido-detalhe','tela-detalhe-pedido'];retired.forEach(id=>$(id)?.remove());
     document.querySelectorAll('[data-action="admin-pedido-cliente-atual"],[data-action="abrir-novo-pedido"],[data-action="novo-pedido"]').forEach(el=>el.remove());
     const original=abrirTela;abrirTela=function(id,history){if(retired.includes(id))id='tela-emp-pecas';if(id==='tela-emp-pecas'&&!isOwner())return;const result=original(id,history);if(id==='tela-emp-pecas'){if(typeof atualizarBreadcrumb==='function')atualizarBreadcrumb([{label:'Peças'}]);loadParts().catch(e=>{$('tj-parts-list').textContent=e.message;});}if(id==='tela-cli-orcamentos'||id==='tela-emp-orcamentos')loadRequests();return result;};
-    const version=document.querySelector('.tj-v29-version');if(version)version.textContent='TJ Refrigeração • v37';
+    const version=document.querySelector('.tj-v29-version');if(version)version.textContent='TJ Refrigeração • v38';
     fb().auth.onAuthStateChanged(()=>{generation++;parts=[];requests=[];['tj-parts-list','tj-requests-client','tj-requests-owner'].forEach(id=>$(id)?.replaceChildren());});
   }
   setup();

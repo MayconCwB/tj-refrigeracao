@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v37-pecas-atendimento';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v38-deslocamento';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
@@ -7,6 +7,9 @@ const APP_SHELL = [
   './assets/tj-cadastros.js',
   './assets/tj-atendimento.js',
   './assets/tj-atendimento-pecas.js',
+  './assets/tj-deslocamento.js',
+  './assets/tj-media-config.js',
+  './assets/tj-chamado-media.js',
   './assets/tj-cliente-acompanhamento.js',
   './manifest.webmanifest',
   './assets/tj-logo.png',
