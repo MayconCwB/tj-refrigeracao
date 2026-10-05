@@ -4820,7 +4820,1434 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
       var temaEmp = document.getElementById("cfg-tema-emp");
       if (temaEmp && window.TJTheme) temaEmp.value = window.TJTheme.getMode();
       var inpHora = document.getElementById("cfg-horario");
-      if (inpHora) inpHora.value =: "Hoje",
+      if (inpHora) inpHora.value = state.configEmpresa.horario;
+
+      var chkIni = document.getElementById("cfg-not-iniciar");
+      if (chkIni) chkIni.checked = !!state.configEmpresa.notIniciar;
+      var chkFin = document.getElementById("cfg-not-finalizar");
+      if (chkFin) chkFin.checked = !!state.configEmpresa.notFinalizar;
+      var chkOrc = document.getElementById("cfg-not-orcamento");
+      if (chkOrc) chkOrc.checked = !!state.configEmpresa.notOrcamento;
+
+      var sNova = document.getElementById("cfg-senha-nova");
+      if (sNova) sNova.value = "";
+      var sConf = document.getElementById("cfg-senha-conf");
+      if (sConf) sConf.value = "";
+    }
+
+    // Próximo atendimento do painel: usa somente agendamentos reais carregados do Firebase.
+    function renderizarProximoAtendimentoEmpresa() {
+      var box = document.getElementById("dash-emp-proximo-atendimento");
+      if (!box) return;
+      box.innerHTML = "";
+      var lista = Array.isArray(state.agendamentos) ? state.agendamentos.slice() : [];
+      var agora = new Date();
+      var inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).getTime();
+      function dataHora(ag) {
+        var d = String(ag.data || "");
+        var h = String(ag.hora || "00:00");
+        var m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        var hm = h.match(/^(\d{1,2}):(\d{2})/);
+        if (!m) return null;
+        return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]), hm?Number(hm[1]):0, hm?Number(hm[2]):0);
+      }
+      var candidatos = lista.filter(function(ag){
+        var st = String(ag.status || "").toLowerCase();
+        if (st === "cancelado" || st === "concluído" || st === "concluido") return false;
+        var dt = dataHora(ag);
+        if (!dt) return false;
+        return dt.getTime() >= inicioHoje || st === "em atendimento";
+      }).sort(function(a,b){ return dataHora(a).getTime() - dataHora(b).getTime(); });
+      if (!candidatos.length) {
+        var vazio=document.createElement("p");
+        vazio.className="tj-proximo-vazio";
+        vazio.textContent="Nenhum atendimento agendado no momento.";
+        box.appendChild(vazio);
+        return;
+      }
+      var ag=candidatos[0], ch=null;
+      if(ag.chamado){
+        ch=(state.chamados||[]).find(function(x){return String(x.num)===String(ag.chamado);})||null;
+      }
+      var card=document.createElement("div");
+      card.className="tj-proximo-card";
+      var info=document.createElement("div"); info.className="tj-proximo-info";
+      info.appendChild(criarBadge(ag.status||"Agendado"));
+      var titulo=document.createElement("p"); titulo.className="tj-proximo-titulo";
+      titulo.textContent=ch ? ("#"+ch.num+" — "+(ch.equip||ag.tipo||"Atendimento")) : (ag.tipo||"Atendimento agendado");
+      var meta=document.createElement("p"); meta.className="tj-proximo-meta";
+      meta.textContent=(ag.cliente||"Cliente")+" • "+(ag.agend||formatarDataAgendamento(ag.data,ag.hora));
+      info.appendChild(titulo); info.appendChild(meta); card.appendChild(info);
+      var btn=document.createElement("button"); btn.type="button"; btn.className="btn-tj";
+      if(ch){ btn.textContent="Abrir atendimento"; btn.setAttribute("data-action","abrir-atend"); btn.setAttribute("data-id",ch.num); }
+      else { btn.textContent="Ver agendamento"; btn.setAttribute("data-action","nav-tela"); btn.setAttribute("data-id","tela-emp-agendamentos"); }
+      card.appendChild(btn); box.appendChild(card);
+    }
+
+    // DASHBOARD EMPRESA (TJ)
+    function renderizarDashEmpresa() {
+      var abertos = 0;
+      var andamento = 0;
+      for (var i = 0; i < state.chamados.length; i++) {
+        var s = state.chamados[i].status;
+        if (s === "Aguardando início" || s === "Aguardando aprovação") abertos++;
+        if (s === "Em atendimento") andamento++;
+      }
+      var orcAguardando = 0;
+      for (var j = 0; j < state.orcamentos.length; j++) {
+        if (state.orcamentos[j].status === "Aguardando aprovação") orcAguardando++;
+      }
+
+      var elAb = document.getElementById("kpi-emp-abertos");
+      if (elAb) elAb.textContent = String(abertos);
+      var elAnd = document.getElementById("kpi-emp-andamento");
+      if (elAnd) elAnd.textContent = String(andamento);
+      var elOrc = document.getElementById("kpi-emp-orc");
+      if (elOrc) elOrc.textContent = String(orcAguardando);
+      var agendAtivos = 0;
+      var listaAg = Array.isArray(state.agendamentos) ? state.agendamentos : [];
+      for (var a = 0; a < listaAg.length; a++) {
+        var stAg = String(listaAg[a].status || '').toLowerCase();
+        if (stAg !== 'cancelado' && stAg !== 'concluído' && stAg !== 'concluido') agendAtivos++;
+      }
+      var elAg = document.getElementById("kpi-emp-agend");
+      if (elAg) elAg.textContent = String(agendAtivos);
+      var elEq = document.getElementById("kpi-emp-equip");
+      if (elEq) elEq.textContent = String(state.equip.length);
+      renderizarProximoAtendimentoEmpresa();
+
+      // Chamados recebidos de todos os clientes
+      var box = document.getElementById("dash-emp-chamados");
+      if (box) {
+        while (box.firstChild) box.removeChild(box.firstChild);
+        for (var k = 0; k < state.chamados.length; k++) {
+          var ch = state.chamados[k];
+          var item = document.createElement("div");
+          item.className = "list-item";
+          item.setAttribute("data-action", "abrir-atend");
+          item.setAttribute("data-id", ch.num);
+
+          var top = document.createElement("div");
+          top.className = "list-header";
+
+          var tit = document.createElement("span");
+          tit.className = "list-title";
+          tit.textContent = "#" + ch.num + " — " + ch.equip;
+
+          var bdg = criarBadge(ch.status);
+          top.appendChild(tit);
+          top.appendChild(bdg);
+
+          var meta = document.createElement("div");
+          meta.className = "list-meta";
+          meta.textContent = "Cliente: " + ch.cliente + " • Previsão: " + (ch.agend || "A definir");
+
+          item.appendChild(top);
+          item.appendChild(meta);
+          box.appendChild(item);
+        }
+      }
+    }
+
+    // CHAMADOS DA EMPRESA
+    function renderizarChamadosEmpresa() {
+      var box = document.getElementById("lista-emp-chamados");
+      if (!box) return;
+      while (box.firstChild) box.removeChild(box.firstChild);
+
+      for (var i = 0; i < state.chamados.length; i++) {
+        var ch = state.chamados[i];
+        var item = document.createElement("div");
+        item.className = "list-item";
+        item.setAttribute("data-action", "abrir-atend");
+        item.setAttribute("data-id", ch.num);
+
+        var top = document.createElement("div");
+        top.className = "list-header";
+
+        var tit = document.createElement("span");
+        tit.className = "list-title";
+        tit.textContent = "#" + ch.num + " — " + ch.equip;
+
+        var bdg = criarBadge(ch.status);
+        top.appendChild(tit);
+        top.appendChild(bdg);
+
+        var meta = document.createElement("div");
+        meta.className = "list-meta";
+        meta.textContent = "Cliente: " + ch.cliente + " • Previsão: " + (ch.agend || "A definir");
+
+        item.appendChild(top);
+        item.appendChild(meta);
+        box.appendChild(item);
+      }
+    }
+
+    // ATENDIMENTO EMPRESA (TJ)
+    function renderizarAtendimentoEmpresa() {
+      var ch = null;
+      for (var i = 0; i < state.chamados.length; i++) {
+        if (String(state.chamados[i].num) === String(chamadoAtualNum)) {
+          ch = state.chamados[i];
+          break;
+        }
+      }
+      if (!ch) return;
+
+      var atendData = state.atendimentos[ch.num] || {endereco: "", previsao: "", diag: "", pecas: []};
+
+      var tit = document.getElementById("atend-emp-titulo");
+      if (tit) tit.textContent = "ATENDIMENTO #" + ch.num;
+
+      var bdgBox = document.getElementById("atend-emp-badge");
+      if (bdgBox) {
+        while (bdgBox.firstChild) bdgBox.removeChild(bdgBox.firstChild);
+        bdgBox.appendChild(criarBadge(ch.status));
+      }
+
+      var elCli = document.getElementById("atend-emp-cliente");
+      if (elCli) elCli.textContent = ch.cliente || "Cliente não identificado";
+
+      var elPrev = document.getElementById("atend-emp-previsao");
+      if (elPrev) elPrev.textContent = ch.agend || atendData.previsao || "Ainda não agendado";
+
+      var elEnd = document.getElementById("atend-emp-endereco");
+      if (elEnd) {
+        var enderecoExibicao = atendData.endereco || "";
+        if (!enderecoExibicao) {
+          for (var eEnd = 0; eEnd < (state.enderecosCliente || []).length; eEnd++) {
+            var endCli = state.enderecosCliente[eEnd];
+            if ((ch.clienteUid && endCli.clienteUid === ch.clienteUid) || (!ch.clienteUid && endCli.cliente === ch.cliente)) {
+              enderecoExibicao = [endCli.rua, endCli.num].filter(Boolean).join(", ");
+              if (endCli.cidade) enderecoExibicao += (enderecoExibicao ? " — " : "") + endCli.cidade;
+              break;
+            }
+          }
+        }
+        elEnd.textContent = enderecoExibicao || "Endereço não informado";
+      }
+
+      // Dados técnicos via busca no equipamento
+      var eqInfo = document.getElementById("atend-emp-equip-info");
+      var eqAchado = null;
+      for (var e = 0; e < state.equip.length; e++) {
+        if (state.equip[e].nome.toLowerCase().indexOf(ch.equip.toLowerCase()) !== -1 ||
+            ch.equip.toLowerCase().indexOf(state.equip[e].nome.toLowerCase()) !== -1) {
+          eqAchado = state.equip[e];
+          break;
+        }
+      }
+      if (eqInfo) {
+        if (eqAchado) {
+          eqInfo.textContent = eqAchado.nome + " • Marca: " + eqAchado.marca + " • Modelo: " + eqAchado.modelo + " • S/N: " + eqAchado.sn + " • Local: " + eqAchado.local;
+        } else {
+          eqInfo.textContent = (ch.equip || "Equipamento não informado") + " • Dados técnicos ainda não cadastrados";
+        }
+      }
+
+      var diagTxt = document.getElementById("atend-emp-diag-texto");
+      if (diagTxt) {
+        diagTxt.textContent = atendData.diag ? atendData.diag : "Nenhum diagnóstico registrado até o momento.";
+      }
+
+      // Botões contextuais de atendimento
+      var btnBox = document.getElementById("atend-emp-botoes-acoes");
+      if (btnBox) {
+        while (btnBox.firstChild) btnBox.removeChild(btnBox.firstChild);
+
+        if (ch.status === "Aguardando início") {
+          var bInit = document.createElement("button");
+          bInit.type = "button";
+          bInit.className = "btn-tj";
+          bInit.textContent = "▶️ INICIAR ATENDIMENTO";
+          bInit.setAttribute("data-action", "iniciar-atend-emp");
+          btnBox.appendChild(bInit);
+        } else if (ch.status === "Em atendimento") {
+          var bDiag = document.createElement("button");
+          bDiag.type = "button";
+          bDiag.className = "btn-tj-secondary";
+          bDiag.textContent = "📝 REGISTRAR DIAGNÓSTICO";
+          bDiag.setAttribute("data-action", "mostrar-form-diag");
+
+          var bPeca = document.createElement("button");
+          bPeca.type = "button";
+          bPeca.className = "btn-tj-secondary";
+          bPeca.textContent = "🔩 ADICIONAR PEÇA";
+          bPeca.setAttribute("data-action", "mostrar-form-peca");
+
+          var bFin = document.createElement("button");
+          bFin.type = "button";
+          bFin.className = "btn-tj";
+          bFin.style.background = "#16A34A";
+          bFin.textContent = "✅ FINALIZAR ATENDIMENTO";
+          bFin.setAttribute("data-action", "finalizar-atend-emp");
+
+          btnBox.appendChild(bDiag);
+          btnBox.appendChild(bPeca);
+          btnBox.appendChild(bFin);
+        } else if (ch.status === "Concluído") {
+          var pFin = document.createElement("span");
+          pFin.style.color = "#16A34A";
+          pFin.style.fontWeight = "600";
+          pFin.style.fontSize = "0.85rem";
+          pFin.textContent = "✓ Atendimento finalizado e arquivado.";
+          btnBox.appendChild(pFin);
+        }
+      }
+
+      // Tabela de Peças
+      var pecasBody = document.getElementById("atend-emp-pecas-body");
+      if (pecasBody) {
+        while (pecasBody.firstChild) pecasBody.removeChild(pecasBody.firstChild);
+        if (!atendData.pecas || atendData.pecas.length === 0) {
+          var rNone = document.createElement("tr");
+          var cNone = document.createElement("td");
+          cNone.setAttribute("colspan", "3");
+          cNone.style.color = "#64748B";
+          cNone.textContent = "Nenhuma peça adicionada neste atendimento.";
+          rNone.appendChild(cNone);
+          pecasBody.appendChild(rNone);
+        } else {
+          for (var p = 0; p < atendData.pecas.length; p++) {
+            var rowP = document.createElement("tr");
+            var itemP = atendData.pecas[p];
+
+            var tdP1 = document.createElement("td");
+            tdP1.textContent = Array.isArray(itemP) ? (itemP[0] || "") : (itemP.descricao || itemP.item || itemP.nome || "");
+            var tdP2 = document.createElement("td");
+            tdP2.textContent = Array.isArray(itemP) ? (itemP[1] || "") : (itemP.qtd || itemP.quantidade || "");
+            var tdP3 = document.createElement("td");
+            tdP3.textContent = Array.isArray(itemP) ? (itemP[2] || "") : (itemP.valor || itemP.preco || "");
+
+            rowP.appendChild(tdP1);
+            rowP.appendChild(tdP2);
+            rowP.appendChild(tdP3);
+            pecasBody.appendChild(rowP);
+          }
+        }
+      }
+
+      // Renderizar Chat Lado Empresa
+      renderizarChat("atend-emp-chat", ch.num);
+    }
+
+    // HISTÓRICO EMPRESA
+    function renderizarHistoricoEmpresa() {
+      var box = document.getElementById("lista-emp-historico");
+      if (!box) return;
+      while (box.firstChild) box.removeChild(box.firstChild);
+
+      for (var i = 0; i < state.historicoEmpresa.length; i++) {
+        var h = state.historicoEmpresa[i];
+        if (histFiltroEmp !== "tudo" && h.tipo !== histFiltroEmp) {
+          continue;
+        }
+
+        var item = document.createElement("div");
+        item.className = "timeline-item";
+
+        var dot = document.createElement("div");
+        dot.className = "timeline-dot";
+        if (h.tipo === "chamado") dot.style.background = "#0B2A4A";
+        else if (h.tipo === "atend") dot.style.background = "#16A34A";
+        else if (h.tipo === "orcamento") dot.style.background = "#2E9BD6";
+        else if (h.tipo === "equip") dot.style.background = "#8B5CF6";
+
+        var cont = document.createElement("div");
+        cont.className = "timeline-content";
+
+        var header = document.createElement("div");
+        header.className = "hist-emp-header";
+
+        var tit = document.createElement("div");
+        tit.className = "timeline-title hist-emp-title";
+        var nomeHistorico = h.cliente || "Cliente";
+        if (h.clienteUid && (!nomeHistorico || nomeHistorico === h.clienteUid || (String(nomeHistorico).length>=20 && !/\s/.test(String(nomeHistorico))))) {
+          var mapaHist=(window.TJFB&&window.TJFB.nomesClientesPorUid)||{};
+          nomeHistorico=mapaHist[h.clienteUid]||'';
+          if(!nomeHistorico){
+            for (var cH = 0; cH < (state.clientesFirebase || []).length; cH++) {
+              if (state.clientesFirebase[cH].uid === h.clienteUid) { nomeHistorico = state.clientesFirebase[cH].nome; break; }
+            }
+          }
+          if(!nomeHistorico || nomeHistorico===h.clienteUid) nomeHistorico='Cliente sem nome cadastrado';
+        }
+        tit.textContent = h.data + " — " + nomeHistorico + " — " + h.titulo;
+
+        var bdg = criarBadge(h.status);
+        header.appendChild(tit);
+        header.appendChild(bdg);
+
+        var sub = document.createElement("div");
+        sub.className = "timeline-sub";
+        sub.textContent = h.desc;
+
+        cont.appendChild(header);
+        cont.appendChild(sub);
+        item.appendChild(dot);
+        item.appendChild(cont);
+        box.appendChild(item);
+      }
+    }
+
+    // EQUIPAMENTOS EMPRESA
+    function renderizarEquipamentosEmpresa() {
+      var box = document.getElementById("lista-emp-equipamentos");
+      if (!box) return;
+      while (box.firstChild) box.removeChild(box.firstChild);
+
+      for (var i = 0; i < state.equip.length; i++) {
+        var eq = state.equip[i];
+        var item = document.createElement("div");
+        item.className = "list-item";
+        item.setAttribute("data-action", "abrir-equip");
+        item.setAttribute("data-id", eq.id);
+
+        var top = document.createElement("div");
+        top.className = "list-header";
+
+        var tit = document.createElement("span");
+        tit.className = "list-title";
+        tit.textContent = "❄️ " + eq.nome + " — " + eq.marca + " " + eq.modelo;
+
+        var bdg = criarBadge(eq.status);
+        top.appendChild(tit);
+        top.appendChild(bdg);
+
+        var meta = document.createElement("div");
+        meta.className = "list-meta";
+        meta.textContent = "Cliente: " + eq.cliente + " • Local: " + eq.local + " • " + (Number.isFinite(Number(eq.ncham)) && Number(eq.ncham) >= 0 ? Math.floor(Number(eq.ncham)) : 0) + " chamados";
+
+        item.appendChild(top);
+        item.appendChild(meta);
+        box.appendChild(item);
+      }
+    }
+
+    // DETALHE DO EQUIPAMENTO (EMPRESA)
+    function renderizarDetalheEquipamento() {
+      var eq = null;
+      for (var i = 0; i < state.equip.length; i++) {
+        if (state.equip[i].id === equipAtualId) {
+          eq = state.equip[i];
+          break;
+        }
+      }
+      if (!eq) return;
+
+      var elNome = document.getElementById("det-eq-nome");
+      if (elNome) elNome.textContent = eq.nome;
+
+      var bdgBox = document.getElementById("det-eq-badge");
+      if (bdgBox) {
+        while (bdgBox.firstChild) bdgBox.removeChild(bdgBox.firstChild);
+        bdgBox.appendChild(criarBadge(eq.status));
+      }
+
+      var elCli = document.getElementById("det-eq-cliente");
+      if (elCli) elCli.textContent = eq.cliente;
+
+      var elLoc = document.getElementById("det-eq-local");
+      if (elLoc) elLoc.textContent = eq.local;
+
+      var elMarca = document.getElementById("det-eq-marca-mod");
+      if (elMarca) elMarca.textContent = eq.marca + " / " + eq.modelo;
+
+      var elSn = document.getElementById("det-eq-sn");
+      if (elSn) elSn.textContent = eq.sn;
+
+      var elN = document.getElementById("det-eq-ncham");
+      if (elN) elN.textContent = (Number.isFinite(Number(eq.ncham)) && Number(eq.ncham) >= 0 ? Math.floor(Number(eq.ncham)) : 0) + " atendimentos registrados";
+    }
+
+    // ORÇAMENTOS EMPRESA
+    function renderizarOrcamentosEmpresa() {
+      var box = document.getElementById("lista-emp-orcamentos");
+      if (!box) return;
+      while (box.firstChild) box.removeChild(box.firstChild);
+
+      for (var i = 0; i < state.orcamentos.length; i++) {
+        var o = state.orcamentos[i];
+        var item = document.createElement("div");
+        item.className = "list-item";
+        item.setAttribute("data-action", "abrir-orc");
+        item.setAttribute("data-id", o.num);
+
+        var top = document.createElement("div");
+        top.className = "list-header";
+
+        var tit = document.createElement("span");
+        tit.className = "list-title";
+        tit.textContent = "Orçamento #" + o.num + " — " + o.servico;
+
+        var bdg = criarBadge(o.status);
+        top.appendChild(tit);
+        top.appendChild(bdg);
+
+        var meta = document.createElement("div");
+        meta.className = "list-meta";
+        meta.textContent = "Cliente: " + o.cliente + " • Total: " + o.total;
+
+        item.appendChild(top);
+        item.appendChild(meta);
+        box.appendChild(item);
+      }
+    }
+
+    // PERFIL EMPRESA
+    function renderizarPerfilEmpresa() {
+      var countC = document.getElementById("emp-contatos-count");
+      if (countC) countC.textContent = "CONTATOS (" + state.contatosEmpresa.length + ")";
+      var boxC = document.getElementById("lista-emp-contatos");
+      if (boxC) {
+        while (boxC.firstChild) boxC.removeChild(boxC.firstChild);
+        for (var i = 0; i < state.contatosEmpresa.length; i++) {
+          var c = state.contatosEmpresa[i];
+          var div = document.createElement("div");
+          div.style.padding = "10px";
+          div.style.border = "1px solid #E2E8F0";
+          div.style.borderRadius = "6px";
+          div.style.display = "flex";
+          div.style.justifyContent = "space-between";
+          div.style.alignItems = "center";
+
+          var info = document.createElement("div");
+          var sNome = document.createElement("strong");
+          sNome.textContent = c.nome;
+          var sCargo = document.createElement("span");
+          sCargo.style.fontSize = "0.82rem";
+          sCargo.style.color = "#64748B";
+          sCargo.textContent = " • " + c.cargo + " • " + c.tel;
+          info.appendChild(sNome);
+          info.appendChild(sCargo);
+
+          div.appendChild(info);
+          boxC.appendChild(div);
+        }
+      }
+
+      var countE = document.getElementById("emp-enderecos-count");
+      if (countE) countE.textContent = "ENDEREÇOS (" + state.enderecosEmpresa.length + ")";
+      var boxE = document.getElementById("lista-emp-enderecos");
+      if (boxE) {
+        while (boxE.firstChild) boxE.removeChild(boxE.firstChild);
+        for (var j = 0; j < state.enderecosEmpresa.length; j++) {
+          var e = state.enderecosEmpresa[j];
+          var divE = document.createElement("div");
+          divE.style.padding = "10px";
+          divE.style.border = "1px solid #E2E8F0";
+          divE.style.borderRadius = "6px";
+          divE.style.display = "flex";
+          divE.style.justifyContent = "space-between";
+          divE.style.alignItems = "center";
+
+          var infoE = document.createElement("div");
+          var sAp = document.createElement("strong");
+          sAp.textContent = e.apelido;
+          var sRua = document.createElement("span");
+          sRua.style.fontSize = "0.82rem";
+          sRua.style.color = "#64748B";
+          sRua.textContent = " • " + e.rua + ", " + e.num + " — " + e.cidade;
+          infoE.appendChild(sAp);
+          infoE.appendChild(sRua);
+
+          divE.appendChild(infoE);
+          boxE.appendChild(divE);
+        }
+      }
+    }
+
+    // ==========================================
+    // DESPACHANTE GLOBAL DE CLIQUES
+    // ==========================================
+    document.addEventListener("click", function(e) {
+      var el = e.target;
+
+      // Clique no fundo escuro do drawer fecha o menu.
+      var overlay = document.getElementById("drawer-overlay");
+      if (overlay && el === overlay) {
+        fecharDrawer();
+        return;
+      }
+
+      // Todos os botões com data-action funcionam por delegação global.
+      var target = (el && typeof el.closest === "function") ? el.closest("[data-action]") : null;
+      if (!target) return;
+
+      var acao = target.getAttribute("data-action");
+      var id = target.getAttribute("data-id") || "";
+      if (!acao) return;
+      try {
+        executarAcao(acao, id);
+      } catch (erro) {
+        console.error("TJ Refrigeração — erro na ação:", acao, erro);
+        if (typeof toast === "function") toast("Não foi possível executar esta ação. Tente novamente.");
+      }
+    });
+
+    // Teclado: Enter nos acessos e Esc para fechar menu/modal.
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") {
+        if (menuAberto) fecharDrawer();
+        var modal = document.getElementById("modal-global");
+        if (modal && !modal.classList.contains("hidden")) fecharModal();
+        return;
+      }
+
+      if (e.key === "Enter") {
+        var tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : "";
+        if (tag === "textarea") return;
+
+        if ((e.target && e.target.id === "login-email") || (e.target && e.target.id === "login-senha")) {
+          e.preventDefault();
+          var btnLogin = document.querySelector('[data-action="entrar-cliente"]');
+          if (btnLogin) btnLogin.click();
+          return;
+        }
+
+        if ((e.target && e.target.id === "email-empresa-input") || (e.target && e.target.id === "senha-empresa-input")) {
+          e.preventDefault();
+          var btnEmpresa = document.querySelector('[data-action="entrar-empresa"]');
+          if (btnEmpresa) btnEmpresa.click();
+        }
+      }
+    });
+
+    function executarAcao(acao, id) {
+      // Toggle Senha
+      if (acao === "toggle-pwd") {
+        var input = document.getElementById(id);
+        if (input) {
+          input.type = input.type === "password" ? "text" : "password";
+        }
+        return;
+      }
+
+      // Gaveta Lateral (Drawer) com Toggle Liga/Desliga
+      if (acao === "abrir-menu" || acao === "abrir-menu-mobile") {
+        toggleDrawer();
+        return;
+      }
+
+      if (acao === "fechar-menu") {
+        fecharDrawer();
+        return;
+      }
+
+      // Botão Voltar Universal (fecha tela atual e volta à anterior)
+      if (acao === "voltar" || acao === "voltar-dash-cli" || acao === "voltar-orcamentos" || acao === "voltar-detalhe-equip") {
+        voltarTela();
+        return;
+      }
+
+      // Voltar para a tela de login a partir do cadastro ou acesso do proprietário.
+      if (acao === "voltar-login") {
+        telaLogin();
+        return;
+      }
+
+      // Login Cliente
+      if (acao === "entrar-cliente") {
+        // A autenticação real é tratada pelo bloco Firebase abaixo.
+        return;
+        state.perfilSessao = "cliente";
+        document.getElementById("auth-container").classList.add("hidden");
+        document.getElementById("painel-principal").classList.remove("hidden");
+
+        var btnBell = document.getElementById("btn-bell-notif");
+        if (btnBell) btnBell.style.display = "flex";
+
+        historicoNavegacao = [];
+        abrirTela("tela-cli-dash", false);
+        toast("Bem-vindo à TJ Refrigeração!");
+        return;
+      }
+
+      // Recuperação de senha — demonstração local
+      if (acao === "esqueci-senha") {
+        if (window.TJFB && window.TJFB.recoverPassword) { window.TJFB.recoverPassword(); }
+        return;
+      }
+
+      // Abertura da tela de autenticação do proprietário.
+      if (acao === "abrir-senha-empresa") {
+        document.getElementById("tela-login").classList.add("hidden");
+        document.getElementById("tela-empresa-senha").classList.remove("hidden");
+        var errBox = document.getElementById("erro-senha-empresa");
+        if (errBox) errBox.style.display = "none";
+        var emailEmp = document.getElementById("email-empresa-input");
+        var inpEmp = document.getElementById("senha-empresa-input");
+        if (emailEmp) emailEmp.value = "";
+        if (inpEmp) inpEmp.value = "";
+        if (emailEmp) emailEmp.focus();
+        return;
+      }
+
+      if (acao === "desbloquear-empresa" || acao === "entrar-empresa") {
+        // Tratado pelo Firebase Authentication + role no Firestore.
+        return;
+      }
+
+      // Cadastro Cliente (Passo 1 e 2)
+      if (acao === "abrir-cadastro") {
+        document.getElementById("tela-login").classList.add("hidden");
+        document.getElementById("tela-cadastro").classList.remove("hidden");
+        document.getElementById("cad-passo-1").classList.remove("hidden");
+        document.getElementById("cad-passo-2").classList.add("hidden");
+        tipoCadastroSelecionado = "";
+        var pf = document.getElementById("tipo-pf");
+        var pj = document.getElementById("tipo-pj");
+        if (pf) pf.classList.remove("selected");
+        if (pj) pj.classList.remove("selected");
+        var btnP1 = document.getElementById("btn-cad-p1-next");
+        if (btnP1) { btnP1.disabled = true; btnP1.style.opacity = "0.5"; }
+        return;
+      }
+
+      if (acao === "selecionar-tipo-cad") {
+        tipoCadastroSelecionado = id;
+        var pPf = document.getElementById("tipo-pf");
+        var pPj = document.getElementById("tipo-pj");
+        var bNext = document.getElementById("btn-cad-p1-next");
+        if (id === "pf") {
+          if (pPf) pPf.classList.add("selected");
+          if (pPj) pPj.classList.remove("selected");
+        } else {
+          if (pPj) pPj.classList.add("selected");
+          if (pPf) pPf.classList.remove("selected");
+        }
+        if (bNext) { bNext.disabled = false; bNext.style.opacity = "1"; }
+        return;
+      }
+
+      if (acao === "cad-avancar-p2") {
+        if (!tipoCadastroSelecionado) return;
+        document.getElementById("cad-passo-1").classList.add("hidden");
+        document.getElementById("cad-passo-2").classList.remove("hidden");
+        var labelNome = document.getElementById("cad-label-nome");
+        if (labelNome) {
+          labelNome.textContent = (tipoCadastroSelecionado === "pj") ? "Razão Social" : "Nome Completo";
+        }
+        return;
+      }
+
+      if (acao === "cad-voltar-p1") {
+        document.getElementById("cad-passo-2").classList.add("hidden");
+        document.getElementById("cad-passo-1").classList.remove("hidden");
+        return;
+      }
+
+      if (acao === "concluir-cadastro") {
+        var nome = document.getElementById("cad-nome").value.trim();
+        var tel = document.getElementById("cad-tel").value.trim();
+        var email = document.getElementById("cad-email").value.trim();
+        var s1 = document.getElementById("cad-senha").value;
+        var s2 = document.getElementById("cad-senha2").value;
+
+        var temErro = false;
+        var eNome = document.getElementById("err-cad-nome");
+        if (!nome) { eNome.style.display = "block"; temErro = true; } else { eNome.style.display = "none"; }
+
+        var eTel = document.getElementById("err-cad-tel");
+        if (!tel || tel.length < 8) { eTel.style.display = "block"; temErro = true; } else { eTel.style.display = "none"; }
+
+        var eEmail = document.getElementById("err-cad-email");
+        if (!email || email.indexOf("@") === -1) { eEmail.style.display = "block"; temErro = true; } else { eEmail.style.display = "none"; }
+
+        var eS1 = document.getElementById("err-cad-senha");
+        if (s1.length < 6) { eS1.style.display = "block"; temErro = true; } else { eS1.style.display = "none"; }
+
+        var eS2 = document.getElementById("err-cad-senha2");
+        if (s1 !== s2) { eS2.style.display = "block"; temErro = true; } else { eS2.style.display = "none"; }
+
+        if (temErro) return;
+
+        state.perfilSessao = "cliente";
+        document.getElementById("auth-container").classList.add("hidden");
+        document.getElementById("painel-principal").classList.remove("hidden");
+
+        historicoNavegacao = [];
+        abrirTela("tela-cli-dash", false);
+        toast("Conta criada com sucesso! Bem-vindo à TJ Refrigeração 🎉");
+        return;
+      }
+
+      // Navegação Geral (fechamento automático garantido)
+      if (acao === "nav-tela") {
+        abrirTela(id);
+        return;
+      }
+
+      // Itens da Gaveta e Navegações Globais
+      if (acao === "abrir-inicio") {
+        abrirTela(state.perfilSessao === "empresa" ? "tela-emp-dash" : "tela-cli-dash");
+        return;
+      }
+
+      if (acao === "abrir-chamados") {
+        abrirTela(state.perfilSessao === "empresa" ? "tela-emp-chamados" : "tela-cli-chamados");
+        return;
+      }
+
+      if (acao === "abrir-orcamentos") {
+        abrirTela(state.perfilSessao === "empresa" ? "tela-emp-orcamentos" : "tela-cli-orcamentos");
+        return;
+      }
+
+      if (acao === "abrir-agenda" || acao === "abrir-agendamentos") {
+        abrirTela(state.perfilSessao === "empresa" ? "tela-emp-agendamentos" : "tela-cli-agenda");
+        return;
+      }
+
+      if (acao === "novo-agendamento-empresa") {
+        limparFormularioAgendamentoEmpresa();
+        abrirTela("tela-emp-novo-agendamento");
+        return;
+      }
+
+      if (acao === "salvar-agendamento-empresa") {
+        salvarAgendamentoEmpresa();
+        return;
+      }
+
+      if (acao === "editar-agendamento-empresa") {
+        editarAgendamentoEmpresa(id);
+        return;
+      }
+
+      if (acao === "excluir-agendamento-empresa") {
+        excluirAgendamentoEmpresa(id);
+        return;
+      }
+
+      if (acao === "ver-agendamento-empresa") {
+        verAgendamentoEmpresa(id);
+        return;
+      }
+
+      if (acao === "cancelar-edicao-agendamento") {
+        limparFormularioAgendamentoEmpresa();
+        abrirTela("tela-emp-agendamentos");
+        return;
+      }
+
+      if (acao === "abrir-equip-cli") {
+        abrirTela("tela-cli-equipamentos");
+        return;
+      }
+
+      if (acao === "abrir-equipamentos") {
+        abrirTela(state.perfilSessao === "empresa" ? "tela-emp-equipamentos" : "tela-cli-equipamentos");
+        return;
+      }
+
+      if (acao === "abrir-perfil") {
+        abrirTela(state.perfilSessao === "empresa" ? "tela-emp-perfil" : "tela-cli-perfil");
+        return;
+      }
+
+      if (acao === "abrir-clientes") {
+        abrirTela("tela-emp-clientes");
+        return;
+      }
+
+      if (acao === "abrir-novo-cliente-empresa") {
+        if (state.perfilSessao !== "empresa") { toast("Acesso restrito ao proprietário."); return; }
+        var tipoCli=document.getElementById("emp-cli-tipo"); if(tipoCli) tipoCli.value="PF";
+        var nomeCli=document.getElementById("emp-cli-nome"); if(nomeCli) nomeCli.value="";
+        var telCli=document.getElementById("emp-cli-tel"); if(telCli) telCli.value="";
+        var emailCli=document.getElementById("emp-cli-email"); if(emailCli) emailCli.value="";
+        abrirTela("tela-emp-novo-cliente");
+        return;
+      }
+
+      if (acao === "cancelar-novo-cliente-empresa") {
+        abrirTela("tela-emp-clientes");
+        return;
+      }
+
+      if (acao === "abrir-pedidos") {
+        abrirTela("tela-emp-pedidos");
+        return;
+      }
+
+      if (acao === "abrir-relatorios") {
+        abrirTela("tela-emp-relatorios");
+        return;
+      }
+
+      if (acao === "abrir-hist" || acao === "abrir-historico") {
+        abrirTela(state.perfilSessao === "empresa" ? "tela-emp-historico" : "tela-cli-historico");
+        return;
+      }
+
+      if (acao === "abrir-config" || acao === "abrir-configuracoes") {
+        abrirTela("tela-emp-config");
+        return;
+      }
+
+      if (acao === "abrir-notific" || acao === "abrir-notificacoes") {
+        abrirTela("tela-cli-notificacoes");
+        return;
+      }
+
+      if (acao === "sair" || acao === "sair-sistema") {
+        fecharDrawer();
+        if (window.TJFB && window.TJFB.auth) { window.TJFB.auth.signOut().catch(function(){}); }
+        historicoNavegacao = [];
+        if (typeof TJMostrarLanding === "function") TJMostrarLanding();
+        else {
+          document.getElementById("painel-principal").classList.add("hidden");
+          document.getElementById("auth-container").classList.remove("hidden");
+          document.getElementById("tela-login").classList.remove("hidden");
+        }
+        toast("Sessão finalizada com segurança.");
+        return;
+      }
+
+      // Notificações
+      if (acao === "ler-notific") {
+        for (var n = 0; n < state.notificacoesCliente.length; n++) {
+          state.notificacoesCliente[n].lida = true;
+        }
+        atualizarBadgeNotificacoes();
+        renderizarNotificacoesCliente();
+        toast("Notificações atualizadas.");
+        return;
+      }
+
+      // Chamados Cliente
+      if (acao === "abrir-chamado") {
+        if (id) chamadoAtualNum = id;
+        abrirTela(state.perfilSessao === "cliente" ? "tela-cli-detalhe-chamado" : "tela-emp-atendimento");
+        return;
+      }
+
+      if (acao === "novo-chamado" || acao === "abrir-novo-chamado") {
+        if (window.TJLimparAnexosNovoChamado) window.TJLimparAnexosNovoChamado();
+        abrirTela("tela-cli-novo-chamado");
+        return;
+      }
+
+      if (acao === "simular-anexo") {
+        // Compatibilidade com versões antigas. Os seletores atuais são inputs nativos
+        // sobre os próprios botões para garantir funcionamento em Android e iOS.
+        return;
+      }
+
+      if (acao === "enviar-chamado" || acao === "enviar-novo-chamado") {
+        if (window.TJFB && window.TJFB.enviarChamadoCliente) window.TJFB.enviarChamadoCliente();
+        else toast("Não foi possível conectar. Recarregue o aplicativo.");
+        return;
+      }
+
+      if (acao === "cancelar-chamado" || acao === "modal-cancelar-chamado") {
+        abrirModal("Deseja realmente cancelar este chamado? Esta ação não pode ser desfeita.", "cancelar-chamado", id || chamadoAtualNum);
+        return;
+      }
+
+      // Mensagens no Chat
+      if (acao === "enviar-msg") {
+        var inpCli = document.getElementById("det-cli-msg-input");
+        var txtCli = inpCli ? inpCli.value.trim() : "";
+        if (!txtCli) return;
+        if (!state.mensagens[chamadoAtualNum]) state.mensagens[chamadoAtualNum] = [];
+        state.mensagens[chamadoAtualNum].push({
+          autor: "cliente",
+          texto: txtCli,
+          hora: "Agora"
+        });
+        inpCli.value = "";
+        renderizarChat("det-cli-chat", chamadoAtualNum);
+        toast("Mensagem enviada!");
+        return;
+      }
+
+      if (acao === "enviar-msg-emp") {
+        var inpEmp = document.getElementById("atend-emp-msg-input");
+        var txtEmp = inpEmp ? inpEmp.value.trim() : "";
+        if (!txtEmp) return;
+        if (!state.mensagens[chamadoAtualNum]) state.mensagens[chamadoAtualNum] = [];
+        state.mensagens[chamadoAtualNum].push({
+          autor: "empresa",
+          texto: txtEmp,
+          hora: "Agora"
+        });
+        inpEmp.value = "";
+        renderizarChat("atend-emp-chat", chamadoAtualNum);
+        toast("Mensagem enviada!");
+        return;
+      }
+
+      // Filtros Histórico
+      if (acao === "filtrar-hist") {
+        histFiltroCli = id || "tudo";
+        renderizarHistoricoCliente();
+        return;
+      }
+
+      if (acao === "filtrar-hist-emp") {
+        histFiltroEmp = id || "tudo";
+        renderizarHistoricoEmpresa();
+        return;
+      }
+
+      // Orçamentos
+      if (acao === "abrir-orc" || acao === "abrir-orcamento") {
+        if (id) orcamentoAtualNum = id;
+        abrirTela("tela-detalhe-orcamento");
+        return;
+      }
+
+      if (acao === "aprovar-orc" || acao === "aprovar-orcamento") {
+        var alvoOrcApr = id || orcamentoAtualNum;
+        var dataApr = new Date().toLocaleDateString("pt-BR");
+        var clienteApr = clienteAtualNome || "Cliente";
+        for (var o = 0; o < state.orcamentos.length; o++) {
+          if (state.orcamentos[o].num === alvoOrcApr) {
+            state.orcamentos[o].status = "Aprovado";
+            state.orcamentos[o].aprovadoEm = dataApr;
+            clienteApr = state.orcamentos[o].cliente || clienteApr;
+            state.orcamentos[o].hist = Array.isArray(state.orcamentos[o].hist) ? state.orcamentos[o].hist : [];
+            state.orcamentos[o].hist.push({data:dataApr, evento:"Aprovado pelo cliente"});
+            break;
+          }
+        }
+        state.historicoCliente.unshift({
+          data: dataApr,
+          tipo: "orcamento",
+          titulo: "Orçamento #" + alvoOrcApr + " aprovado",
+          desc: "Orçamento aprovado pelo cliente",
+          status: "Aprovado"
+        });
+        state.historicoEmpresa.unshift({
+          data: dataApr,
+          tipo: "orcamento",
+          cliente: clienteApr,
+          titulo: "Orçamento #" + alvoOrcApr + " aprovado pelo cliente",
+          desc: "Orçamento aprovado",
+          status: "Aprovado"
+        });
+        state.notificacoesCliente.unshift({
+          data: dataApr,
+          titulo: "Orçamento aprovado",
+          desc: "O orçamento #" + alvoOrcApr + " foi aprovado com sucesso.",
+          lida: false
+        });
+        toast("Orçamento aprovado com sucesso!");
+        renderizarDetalheOrcamento();
+        return;
+      }
+
+      if (acao === "recusar-orc" || acao === "recusar-orcamento") {
+        var alvoOrcRec = id || orcamentoAtualNum;
+        var dataRec = new Date().toLocaleDateString("pt-BR");
+        var clienteRec = clienteAtualNome || "Cliente";
+        for (var r = 0; r < state.orcamentos.length; r++) {
+          if (state.orcamentos[r].num === alvoOrcRec) {
+            state.orcamentos[r].status = "Recusado";
+            state.orcamentos[r].recusadoEm = dataRec;
+            clienteRec = state.orcamentos[r].cliente || clienteRec;
+            state.orcamentos[r].hist = Array.isArray(state.orcamentos[r].hist) ? state.orcamentos[r].hist : [];
+            state.orcamentos[r].hist.push({data:dataRec, evento:"Recusado pelo cliente"});
+            break;
+          }
+        }
+        state.historicoCliente.unshift({
+          data: dataRec,
+          tipo: "orcamento",
+          titulo: "Orçamento #" + alvoOrcRec + " recusado",
+          desc: "Orçamento recusado pelo cliente",
+          status: "Recusado"
+        });
+        state.historicoEmpresa.unshift({
+          data: dataRec,
+          tipo: "orcamento",
+          cliente: clienteRec,
+          titulo: "Orçamento #" + alvoOrcRec + " recusado pelo cliente",
+          desc: "Orçamento recusado",
+          status: "Recusado"
+        });
+        toast("Orçamento recusado.");
+        renderizarDetalheOrcamento();
+        return;
+      }
+
+      // Perfil Cliente e Empresa
+      if (acao === "salvar-perfil" || acao === "salvar-dados-cli" || acao === "salvar-dados-emp") {
+        toast("Dados cadastrais salvos com sucesso!");
+        return;
+      }
+
+      if (acao === "abrir-contato" || acao === "novo-contato" || acao === "abrir-form-contato-cli" || acao === "abrir-form-contato-emp") {
+        document.getElementById("titulo-form-contato-cli").textContent = "Novo Contato";
+        document.getElementById("contato-cli-index").value = "-1";
+        document.getElementById("contato-cli-nome").value = "";
+        document.getElementById("contato-cli-cargo").value = "";
+        document.getElementById("contato-cli-tel").value = "";
+        abrirTela("tela-form-contato-cli");
+        return;
+      }
+
+      if (acao === "editar-contato-cli") {
+        var idx = parseInt(id, 10);
+        var ct = state.contatosCliente[idx];
+        if (ct) {
+          document.getElementById("titulo-form-contato-cli").textContent = "Editar Contato";
+          document.getElementById("contato-cli-index").value = String(idx);
+          document.getElementById("contato-cli-nome").value = ct.nome;
+          document.getElementById("contato-cli-cargo").value = ct.cargo;
+          document.getElementById("contato-cli-tel").value = ct.tel;
+          abrirTela("tela-form-contato-cli");
+        }
+        return;
+      }
+
+      if (acao === "salvar-contato" || acao === "salvar-contato-cli") {
+        var idxSave = parseInt(document.getElementById("contato-cli-index").value, 10);
+        var nomeC = document.getElementById("contato-cli-nome").value.trim() || "Contato";
+        var cargoC = document.getElementById("contato-cli-cargo").value.trim() || "Geral";
+        var telC = document.getElementById("contato-cli-tel").value.trim() || "(11) 99999-0000";
+
+        if (idxSave === -1) {
+          if (state.perfilSessao === "cliente") {
+            state.contatosCliente.push({nome: nomeC, cargo: cargoC, tel: telC});
+          } else {
+            state.contatosEmpresa.push({nome: nomeC, cargo: cargoC, tel: telC});
+          }
+          toast("Contato adicionado.");
+        } else {
+          if (state.perfilSessao === "cliente") {
+            state.contatosCliente[idxSave] = {nome: nomeC, cargo: cargoC, tel: telC};
+          } else {
+            state.contatosEmpresa[idxSave] = {nome: nomeC, cargo: cargoC, tel: telC};
+          }
+          toast("Contato atualizado.");
+        }
+        abrirTela(state.perfilSessao === "cliente" ? "tela-cli-perfil" : "tela-emp-perfil");
+        return;
+      }
+
+      if (acao === "excluir-contato" || acao === "modal-del-contato-cli") {
+        abrirModal("Tem certeza que deseja excluir este contato?", "del-contato-cli", id);
+        return;
+      }
+
+      if (acao === "abrir-endereco" || acao === "novo-endereco" || acao === "abrir-form-end-cli" || acao === "abrir-form-end-emp") {
+        document.getElementById("titulo-form-end-cli").textContent = "Novo Endereço";
+        document.getElementById("end-cli-index").value = "-1";
+        document.getElementById("end-cli-apelido").value = "";
+        document.getElementById("end-cli-rua").value = "";
+        document.getElementById("end-cli-num").value = "";
+        document.getElementById("end-cli-cidade").value = "";
+        abrirTela("tela-form-end-cli");
+        return;
+      }
+
+      if (acao === "salvar-endereco" || acao === "salvar-end-cli") {
+        var apel = document.getElementById("end-cli-apelido").value.trim() || "Novo Local";
+        var tipoE = document.getElementById("end-cli-tipo").value;
+        var ruaE = document.getElementById("end-cli-rua").value.trim() || "Rua Central";
+        var numE = document.getElementById("end-cli-num").value.trim() || "100";
+        var cidE = document.getElementById("end-cli-cidade").value.trim() || "São Paulo / SP";
+
+        if (state.perfilSessao === "cliente") {
+          state.enderecosCliente.push({apelido: apel, tipo: tipoE, rua: ruaE, num: numE, cidade: cidE});
+        } else {
+          state.enderecosEmpresa.push({apelido: apel, tipo: tipoE, rua: ruaE, num: numE, cidade: cidE});
+        }
+        toast("Endereço adicionado.");
+        abrirTela(state.perfilSessao === "cliente" ? "tela-cli-perfil" : "tela-emp-perfil");
+        return;
+      }
+
+      if (acao === "excluir-endereco" || acao === "modal-del-end-cli") {
+        abrirModal("Deseja remover este endereço?", "del-end-cli", id);
+        return;
+      }
+
+      // Ações Empresa
+      if (acao === "abrir-atend") {
+        if (id) chamadoAtualNum = id;
+        abrirTela("tela-emp-atendimento");
+        return;
+      }
+
+      if (acao === "iniciar-atend" || acao === "iniciar-atend-emp") {
+        for (var at = 0; at < state.chamados.length; at++) {
+          if (state.chamados[at].num === chamadoAtualNum) {
+            state.chamados[at].status = "Em atendimento";
+            break;
+          }
+        }
+        state.historicoCliente.unshift({
+          data: "Hoje",
+          tipo: "atend",
+          titulo: "Atendimento iniciado — Chamado #" + chamadoAtualNum,
+          desc: "Técnico TJ iniciou os trabalhos no local.",
+          status: "Em atendimento"
+        });
+        state.historicoEmpresa.unshift({
+          data: "Hoje",
+          tipo: "atend",
+          cliente: "Empresa XYZ",
+          titulo: "Atendimento iniciado — Chamado #" + chamadoAtualNum,
+          desc: "Técnico no local em execução",
+          status: "Em atendimento"
+        });
+        state.notificacoesCliente.unshift({
+          data: "Hoje",
+          titulo: "Atendimento iniciado",
+          desc: "O técnico iniciou o atendimento do chamado #" + chamadoAtualNum + ".",
+          lida: false
+        });
+        toast("Atendimento iniciado!");
+        renderizarAtendimentoEmpresa();
+        return;
+      }
+
+      if (acao === "registrar-diag" || acao === "mostrar-form-diag") {
+        var bDiag = document.getElementById("box-emp-diagnostico");
+        if (bDiag) bDiag.classList.remove("hidden");
+        return;
+      }
+
+      if (acao === "cancelar-diagnostico") {
+        var bDiagC = document.getElementById("box-emp-diagnostico");
+        if (bDiagC) bDiagC.classList.add("hidden");
+        return;
+      }
+
+      if (acao === "salvar-diagnostico") {
+        var inputDiag = document.getElementById("emp-diag-input");
+        var txtD = inputDiag ? inputDiag.value.trim() : "";
+        if (txtD) {
+          if (!state.atendimentos[chamadoAtualNum]) {
+            state.atendimentos[chamadoAtualNum] = {endereco: "", previsao: "", diag: "", pecas: []};
+          }
+          state.atendimentos[chamadoAtualNum].diag = txtD;
+          toast("Diagnóstico salvo!");
+          document.getElementById("box-emp-diagnostico").classList.add("hidden");
+          renderizarAtendimentoEmpresa();
+        }
+        return;
+      }
+
+      if (acao === "add-peca" || acao === "mostrar-form-peca") {
+        var bPeca = document.getElementById("box-emp-peca");
+        if (bPeca) bPeca.classList.remove("hidden");
+        return;
+      }
+
+      if (acao === "cancelar-peca") {
+        var bPecaC = document.getElementById("box-emp-peca");
+        if (bPecaC) bPecaC.classList.add("hidden");
+        return;
+      }
+
+      if (acao === "salvar-peca") {
+        var pNome = document.getElementById("peca-nome").value.trim() || "Peça de reposição";
+        var pQtd = document.getElementById("peca-qtd").value.trim() || "1";
+        var pVal = document.getElementById("peca-valor").value.trim() || "R$ 100,00";
+
+        if (!state.atendimentos[chamadoAtualNum]) {
+          state.atendimentos[chamadoAtualNum] = {endereco: "", previsao: "", diag: "", pecas: []};
+        }
+        if (!state.atendimentos[chamadoAtualNum].pecas) {
+          state.atendimentos[chamadoAtualNum].pecas = [];
+        }
+        state.atendimentos[chamadoAtualNum].pecas.push({descricao:pNome, qtd:pQtd, valor:pVal});
+
+        var chCli = "Empresa XYZ";
+        for (var cIdx = 0; cIdx < state.chamados.length; cIdx++) {
+          if (state.chamados[cIdx].num === chamadoAtualNum) {
+            chCli = state.chamados[cIdx].cliente;
+            break;
+          }
+        }
+        var proxPedNum = "PED-0" + (state.pedidos.length + 14);
+        state.pedidos.unshift({
+          num: proxPedNum,
+          peca: pNome,
+          cliente: chCli,
+          status: "Solicitado",
+          data: "Hoje"
+        });
+
+        toast("Peça adicionada e pedido " + proxPedNum + " criado!");
+        document.getElementById("box-emp-peca").classList.add("hidden");
+        renderizarAtendimentoEmpresa();
+        return;
+      }
+
+      if (acao === "finalizar-atend" || acao === "finalizar-atend-emp") {
+        for (var f = 0; f < state.chamados.length; f++) {
+          if (state.chamados[f].num === chamadoAtualNum) {
+            state.chamados[f].status = "Concluído";
+            break;
+          }
+        }
+        state.historicoCliente.unshift({
+          data: "Hoje",
+          tipo: "atend",
+          titulo: "Atendimento concluído — Chamado #" + chamadoAtualNum,
+          desc: "Equipamento testado e liberado.",
+          status: "Concluído"
+        });
+        state.historicoEmpresa.unshift({
+          data: "Hoje",
+          tipo: "atend",
+          cliente: "Empresa XYZ",
+          titulo: "Atendimento concluído — Chamado #" + chamadoAtualNum,
+          desc: "Serviço finalizado com sucesso.",
+          status: "Concluído"
+        });
+        state.notificacoesCliente.unshift({
+          data: "Hoje",
+          titulo: "Atendimento concluído",
+          desc: "O chamado #" + chamadoAtualNum + " foi concluído pela TJ Refrigeração.",
+          lida: false
+        });
+        toast("Atendimento finalizado! Cliente notificado.");
+        renderizarAtendimentoEmpresa();
+        return;
+      }
+
+      // Equipamentos Empresa
+      if (acao === "abrir-equip") {
+        if (id) equipAtualId = id;
+        abrirTela("tela-detalhe-equipamento");
+        return;
+      }
+
+      if (acao === "hist-equip" || acao === "abrir-hist-equip") {
+        abrirTela("tela-hist-equip");
+        return;
+      }
+
+      if (acao === "criar-equip" || acao === "abrir-novo-equip") {
+        document.getElementById("titulo-form-equip").textContent = "Cadastrar Novo Equipamento";
+        document.getElementById("form-equip-id").value = "";
+        document.getElementById("form-equip-nome").value = "";
+        document.getElementById("form-equip-marca").value = "";
+        document.getElementById("form-equip-modelo").value = "";
+        document.getElementById("form-equip-sn").value = "";
+        document.getElementById("form-equip-local").value = "";
+        abrirTela("tela-form-equipamento");
+        return;
+      }
+
+      if (acao === "editar-equip" || acao === "abrir-editar-equip") {
+        var eqAlvo = id || equipAtualId;
+        var eqEdit = null;
+        for (var ed = 0; ed < state.equip.length; ed++) {
+          if (state.equip[ed].id === eqAlvo) {
+            eqEdit = state.equip[ed];
+            break;
+          }
+        }
+        if (eqEdit) {
+          equipAtualId = eqEdit.id;
+          document.getElementById("titulo-form-equip").textContent = "Editar Equipamento";
+          document.getElementById("form-equip-id").value = eqEdit.id;
+          document.getElementById("form-equip-cliente").value = eqEdit.cliente;
+          document.getElementById("form-equip-nome").value = eqEdit.nome;
+          document.getElementById("form-equip-marca").value = eqEdit.marca;
+          document.getElementById("form-equip-modelo").value = eqEdit.modelo;
+          document.getElementById("form-equip-sn").value = eqEdit.sn;
+          document.getElementById("form-equip-local").value = eqEdit.local;
+          document.getElementById("form-equip-status").value = eqEdit.status;
+          abrirTela("tela-form-equipamento");
+        }
+        return;
+      }
+
+      if (acao === "salvar-equipamento") {
+        var fId = document.getElementById("form-equip-id").value;
+        var fCli = document.getElementById("form-equip-cliente").value;
+        var fNome = document.getElementById("form-equip-nome").value.trim() || "Equipamento";
+        var fMarca = document.getElementById("form-equip-marca").value.trim() || "Genérica";
+        var fMod = document.getElementById("form-equip-modelo").value.trim() || "Standard";
+        var fSn = document.getElementById("form-equip-sn").value.trim() || "0000";
+        var fLoc = document.getElementById("form-equip-local").value.trim() || "Fábrica";
+        var fSt = document.getElementById("form-equip-status").value;
+
+        if (!fId) {
+          var newId = "e" + (state.equip.length + 1);
+          state.equip.push({
+            id: newId,
+            nome: fNome,
+            marca: fMarca,
+            modelo: fMod,
+            sn: fSn,
+            cliente: fCli,
+            local: fLoc,
+            status: fSt,
+            ncham: 0
+          });
+          state.historicoEmpresa.unshift({
+            data: "Hoje",
+            tipo: "equip",
+            cliente: fCli,
+            titulo: "Equipamento cadastrado — " + fNome,
+            desc: fMarca + " " + fMod + " — S/N " + fSn,
+            status: "Cadastrado"
+          });
+          toast("Equipamento cadastrado!");
+          equipAtualId = newId;
+        } else {
+          for (var u = 0; u < state.equip.length; u++) {
+            if (state.equip[u].id === fId) {
+              state.equip[u].cliente = fCli;
+              state.equip[u].nome = fNome;
+              state.equip[u].marca = fMarca;
+              state.equip[u].modelo = fMod;
+              state.equip[u].sn = fSn;
+              state.equip[u].local = fLoc;
+              state.equip[u].status = fSt;
+              break;
+            }
+          }
+          toast("Equipamento atualizado.");
+        }
+        abrirTela("tela-detalhe-equipamento");
+        return;
+      }
+
+      if (acao === "excluir-equip" || acao === "excluir-equip-modal") {
+        var eqDel = id || equipAtualId;
+        abrirModal("Deseja excluir permanentemente este equipamento do cadastro?", "excluir-equip", eqDel);
+        return;
+      }
+
+      // Orçamentos Emitidos TJ
+      if (acao === "criar-orcamento" || acao === "abrir-novo-orcamento") {
+        abrirTela("tela-form-novo-orcamento");
+        return;
+      }
+
+      if (acao === "salvar-novo-orcamento") {
+        var cliO = document.getElementById("novo-orc-cli").value;
+        var servO = document.getElementById("novo-orc-servico").value.trim() || "Revisão geral";
+        var valO = document.getElementById("novo-orc-valor").value.trim() || "R$ 1.200,00";
+
+        var numO = "0023" + (state.orcamentos.length + 2);
+        state.orcamentos.unshift({
+          num: numO,
+          servico: servO,
+          cliente: cliO,
+          status: "Aguardando aprovação",
+          total: valO,
+          itens: [
+            [servO, "1", valO]
+          ],
+          hist: [
+            ["Hoje", "Orçamento emitido e enviado"]
+          ]
+        });
+
+        state.historicoEmpresa.unshift({
+          data: "Hoje",
           tipo: "orcamento",
           cliente: cliO,
           titulo: "Orçamento #" + numO + " emitido",
@@ -5389,7 +6816,1186 @@ html[data-theme="dark"] .modal-msg{color:var(--text)}
     width:100%!important;
     max-width:100%!important;
     min-width:0!important;
-    font-size:teUid)||((obj&&obj.cliente)?((clientePorNome(obj.cliente)||{}).uid||''):'');}
+    font-size:16px;
+    border-radius:10px;
+  }
+  .form-input,.form-select,input.form-input[type="date"],input.form-input[type="time"]{min-height:48px}
+  .form-textarea{min-height:104px}
+
+  /* Grupos de ações ficam fáceis de tocar e alinhados */
+  .admin-card-actions{grid-template-columns:1fr!important}
+  .admin-card-actions>*{width:100%}
+  #atend-emp-botoes-acoes{display:grid!important;grid-template-columns:1fr!important;width:100%;gap:9px!important}
+  #atend-emp-botoes-acoes>button{width:100%;min-width:0;min-height:48px}
+  #box-emp-diagnostico>div:last-child,#box-emp-peca>div:last-child{display:grid!important;grid-template-columns:1fr!important;width:100%;gap:9px!important}
+  #box-emp-diagnostico>div:last-child>button,#box-emp-peca>div:last-child>button{width:100%}
+
+  /* Chat: campo e botão empilhados; nunca quebra ENVIAR */
+  .tj-chat-compose{grid-template-columns:1fr;gap:9px}
+  .tj-chat-compose .form-textarea{min-height:96px}
+  .tj-chat-compose .btn-tj{width:100%;min-width:0;height:auto;min-height:48px;white-space:nowrap}
+  #det-cli-msg-input+button{width:100%;min-height:48px;white-space:nowrap}
+
+  /* Tabela de peças usa a largura inteira, com rolagem só se realmente precisar */
+  .tj-table-wrap .table-custom{min-width:100%;font-size:.86rem}
+  .tj-table-atendimento th,.tj-table-atendimento td{padding:10px 9px}
+  .tj-table-atendimento th:nth-child(1),.tj-table-atendimento td:nth-child(1){min-width:0;white-space:normal;overflow-wrap:anywhere}
+
+  /* Breadcrumb e badges não forçam largura da tela */
+  .breadcrumb-row{max-width:100%;min-width:0}
+  .badge{max-width:100%;white-space:nowrap}
+}
+</style>
+<script>
+(function(){
+'use strict';
+
+/* ============ ETAPA 8: trilha de status do chamado ============ */
+var ETAPAS=[['Solicitação aberta','#22c55e'],['Em análise','#3b82f6'],['Orçamento necessário','#eab308'],['Orçamento enviado','#f97316'],['Aguardando aprovação','#a855f7'],['Em atendimento','#0ea5e9'],['Concluído','#16a34a']];
+/* mapeia o texto do campo de status para a etapa correspondente; edite aqui se usar outras palavras */
+var ALIASES=[['conclu',6],['atend',5],['aprova',4],['enviad',3],['orcam',2],['anali',1],['abert',0]];
+
+function norm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();}
+function indiceStatus(t){t=norm(t);for(var i=0;i<ALIASES.length;i++){if(t.indexOf(ALIASES[i][0])>-1)return ALIASES[i][1];}return 0;}
+
+/* localiza elementos folha cujo texto é exatamente o informado */
+function folhasTexto(txt){
+  var alvo=norm(txt),out=[];
+  document.querySelectorAll('div,span,p,h1,h2,h3,h4,h5,h6,label,b,strong,td,th').forEach(function(el){
+    if(!el.children.length&&norm(el.textContent)===alvo)out.push(el);
+  });
+  return out;
+}
+
+function trilhaHTML(idx){
+  var h='<div class="tj-trilha">';
+  ETAPAS.forEach(function(e,i){
+    var cls=i<idx?'tj-done':(i===idx?'tj-ativo':'');
+    h+='<div class="tj-passo '+cls+'" style="--cor:'+e[1]+'">'
+      +'<span class="tj-bolinha">'+(i<idx?'✓':(i+1))+'</span><span>'+e[0]+'</span></div>';
+  });
+  return h+'</div>';
+}
+
+function injetaTrilha(){
+  folhasTexto('Status do Atendimento').forEach(function(label){
+    var row=label.parentElement;if(!row)return;
+    if(row.nextElementSibling&&row.nextElementSibling.classList.contains('tj-trilha-wrap'))return;
+    var atual=row.textContent.replace(/Status do Atendimento/i,'').trim();
+    var wrap=document.createElement('div');wrap.className='tj-trilha-wrap';
+    wrap.innerHTML='<div class="tj-trilha-titulo">Andamento do chamado</div>'+trilhaHTML(indiceStatus(atual));
+    row.parentElement.insertBefore(wrap,row.nextSibling);
+  });
+}
+
+/* ============ ETAPA 9: decisões do cliente sobre o orçamento ============ */
+function dataDecisaoOrc(o,tipo){
+  if(!o)return '';
+  var campo=tipo==='aprovado'?o.aprovadoEm:o.recusadoEm;
+  if(campo && norm(campo)!=='atualizado' && norm(campo)!=='hoje') return String(campo);
+  var hist=Array.isArray(o.hist)?o.hist:[];
+  for(var h=hist.length-1;h>=0;h--){
+    var item=hist[h]||{};
+    var evento=Array.isArray(item)?(item[1]||''):(item.evento||item.texto||item.descricao||'');
+    var data=Array.isArray(item)?(item[0]||''):(item.data||'');
+    var alvo=tipo==='aprovado'?'aprov':'recus';
+    if(norm(evento).indexOf(alvo)!==-1 && data && norm(data)!=='atualizado'){
+      return norm(data)==='hoje'?'':String(data);
+    }
+  }
+  return '';
+}
+function leDec(){
+  var d={};
+  if(typeof state==='undefined'||!Array.isArray(state.orcamentos)) return d;
+  for(var i=0;i<state.orcamentos.length;i++){
+    var o=state.orcamentos[i];
+    if(!o||!o.num) continue;
+    if(o.status==='Aprovado') d[o.num]={tipo:'aprovado',msg:'',data:dataDecisaoOrc(o,'aprovado')};
+    else if(o.status==='Recusado') d[o.num]={tipo:'recusado',msg:'',data:dataDecisaoOrc(o,'recusado')};
+    else if(o.esclarecimento) d[o.num]={tipo:'esclarecimento',msg:o.esclarecimento,data:''};
+  }
+  return d;
+}
+function salvaDec(d){ return d; }
+function esc(s){return (s||'').replace(/[<>&"]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];});}
+function grava(id,tipo,msg){
+  if(window.TJFB&&window.TJFB.decidirOrcamento){window.TJFB.decidirOrcamento(id,tipo,msg);return;}
+  if(typeof state==='undefined'||!Array.isArray(state.orcamentos)) return;
+  var dataAgora=new Date().toLocaleDateString('pt-BR');
+  for(var i=0;i<state.orcamentos.length;i++){
+    if(String(state.orcamentos[i].num)===String(id)){
+      var o=state.orcamentos[i];
+      if(tipo==='aprovado'){
+        o.status='Aprovado';o.aprovadoEm=dataAgora;
+        o.hist=Array.isArray(o.hist)?o.hist:[];
+        if(!o.hist.some(function(h){var e=Array.isArray(h)?h[1]:(h&&h.evento);return norm(e).indexOf('aprov')!==-1;})) o.hist.push({data:dataAgora,evento:'Aprovado pelo cliente'});
+      }
+      if(tipo==='recusado'){
+        o.status='Recusado';o.recusadoEm=dataAgora;
+        o.hist=Array.isArray(o.hist)?o.hist:[];
+        if(!o.hist.some(function(h){var e=Array.isArray(h)?h[1]:(h&&h.evento);return norm(e).indexOf('recus')!==-1;})) o.hist.push({data:dataAgora,evento:'Recusado pelo cliente'});
+      }
+      if(tipo==='esclarecimento') o.esclarecimento=msg;
+      break;
+    }
+  }
+  if(window.TJFB&&window.TJFB.salvarDadosCliente) window.TJFB.salvarDadosCliente();
+}
+function idDoOrcamento(el){
+  var p=el,guard=0;
+  while(p&&p!==document.body&&guard++<8){
+    var m=p.textContent.match(/Or[çc]amento\s*#(\d+)/i);
+    if(m)return m[1];
+    p=p.parentElement;
+  }
+  return null;
+}
+function chipDecisao(d){
+  if(!d)return '';
+  if(d.tipo==='aprovado')return '<span class="tj-chip tj-chip-aprovado">✅ '+(d.data?'Aprovado em '+esc(d.data):'Orçamento aprovado')+'</span>';
+  if(d.tipo==='recusado')return '<span class="tj-chip tj-chip-recusado">❌ '+(d.data?'Recusado em '+esc(d.data):'Orçamento recusado')+'</span>';
+  return '<span class="tj-chip tj-chip-esclarecimento">💬 Esclarecimento solicitado</span>';
+}
+
+function injetaAcoesOrcamento(){
+  if(state.perfilSessao!=='cliente'){document.querySelectorAll('.tj-barra-acoes').forEach(function(el){el.remove();});return;}
+  folhasTexto('Valor Total:').forEach(function(folha){
+    var card=folha.closest('table')||folha.parentElement.parentElement||folha.parentElement;
+    if(!card)return;
+    var id=idDoOrcamento(folha);if(!id)return;
+    var orc=(state.orcamentos||[]).find(function(o){return String(o.num)===String(id);});
+    var existente=card.nextElementSibling&&card.nextElementSibling.classList.contains('tj-barra-acoes')?card.nextElementSibling:null;
+    if(!orc||orc.status!=='Aguardando aprovação'){if(existente)existente.remove();return;}
+    if(existente)return;
+    var d=leDec()[id];
+    var barra=document.createElement('div');barra.className='tj-barra-acoes';
+    barra.innerHTML=(d?chipDecisao(d):'<span style="font-size:.8rem;opacity:.6">Aguardando sua decisão</span>')
+      +'<button class="tj-btn-decisao tj-btn-aprovar" data-tj-tipo="aprovado">✅ Aprovar orçamento</button>'
+      +'<button class="tj-btn-decisao tj-btn-recusar" data-tj-tipo="recusado">❌ Recusar</button>'
+      +'<button class="tj-btn-decisao tj-btn-esclarecer" data-tj-tipo="esclarecimento">💬 Pedir esclarecimento</button>';
+    if(d&&d.tipo==='esclarecimento'){
+      barra.innerHTML+='<div class="tj-box-esclarecimento"><b>Sua mensagem:</b> '+esc(d.msg)+'</div>';
+    }
+    card.insertAdjacentElement('afterend',barra);
+    var box=null;
+    barra.querySelectorAll('.tj-btn-decisao').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var tipo=btn.dataset.tjTipo;
+        if(tipo==='esclarecimento'){
+          if(box){box.remove();box=null;return;}
+          box=document.createElement('div');box.className='tj-box-esclarecimento';
+          box.innerHTML='<textarea placeholder="Escreva sua dúvida sobre este orçamento..."></textarea>'
+            +'<button class="tj-btn-decisao tj-btn-esclarecer" style="margin-top:8px">Enviar pedido</button>';
+          barra.appendChild(box);
+          box.querySelector('button').addEventListener('click',function(){
+            var msg=box.querySelector('textarea').value.trim();if(!msg)return;
+            grava(id,'esclarecimento',msg);rodaTudo();
+          });
+        }else{
+          grava(id,tipo,'');rodaTudo();
+        }
+      });
+    });
+  });
+}
+
+/* selo de decisão nas listas de orçamentos (cliente e dono) */
+function injetaChips(){
+  var d=leDec();
+  document.querySelectorAll('div,span,p,h3,h4').forEach(function(el){
+    if(el.children.length)return;
+    var m=norm(el.textContent).match(/orcamento #(\d+)/);
+    if(!m)return;
+    var rec=d[m[1]];if(!rec)return;
+    var alvo=el.parentElement;if(!alvo)return;
+    if(alvo.querySelector('.tj-chip'))return;
+    alvo.insertAdjacentHTML('beforeend',chipDecisao(rec));
+  });
+}
+
+/* ============ ETAPA 9: itens detalhados no formulário do dono ============ */
+function injetaEditorItens(){
+  folhasTexto('Valor Total (R$)').forEach(function(folha){
+    var alvo=folha.parentElement||folha;
+    var guard=0;
+    while(alvo&&alvo.parentElement&&!(alvo.querySelector&&alvo.querySelector('input'))&&guard++<6)alvo=alvo.parentElement;
+    if(!alvo||!alvo.parentElement)return;
+    if(alvo.previousElementSibling&&alvo.previousElementSibling.classList.contains('tj-editor-itens'))return;
+    var editor=document.createElement('div');editor.className='tj-editor-itens';
+    editor.innerHTML='<h4>Itens do orçamento (peça, mão de obra, serviço)</h4>'
+      +'<div class="tj-linha-item tj-linha-cab"><span>Descrição</span><span>Qtd</span><span>Valor unitário (R$)</span><span></span></div>'
+      +'<div class="tj-corpo-itens"></div>'
+      +'<button type="button" class="tj-link-add tj-add-item">+ Adicionar item</button>'
+      +'<div class="tj-total-itens">Total dos itens: R$ 0,00</div>';
+    alvo.parentElement.insertBefore(editor,alvo);
+    var corpo=editor.querySelector('.tj-corpo-itens');
+    var campoTotal=alvo.querySelector('input');
+    function linha(item){
+      item=item||{};
+      var l=document.createElement('div');l.className='tj-linha-item';
+      l.innerHTML='<input type="text" class="tj-item-desc" autocomplete="off" placeholder="Descrição completa do item ou serviço">'
+        +'<input type="number" class="tj-item-qtd" inputmode="numeric" min="1" step="1" value="1" aria-label="Quantidade">'
+        +'<input type="number" class="tj-item-valor" inputmode="decimal" step="0.01" min="0" placeholder="0,00" aria-label="Valor unitário">'
+        +'<button type="button" class="tj-link-add tj-remover-item" title="Remover item" aria-label="Remover item">✕</button>';
+      var ins=l.querySelectorAll('input');
+      ins[0].value=item.descricao||item.desc||'';
+      ins[1].value=item.qtd||item.quantidade||'1';
+      ins[2].value=item.valor||item.preco||'';
+      l.querySelector('button').addEventListener('click',function(){l.remove();if(!corpo.children.length)linha({});total();});
+      ins.forEach(function(i){i.addEventListener('input',total);});
+      corpo.appendChild(l);
+      return l;
+    }
+    function total(){
+      var soma=0;
+      corpo.querySelectorAll('.tj-linha-item').forEach(function(l){
+        var ins=l.querySelectorAll('input');
+        var q=parseFloat((ins[1]&&ins[1].value)||0)||0;
+        var v=parseFloat(String((ins[2]&&ins[2].value)||0).replace(',','.'))||0;
+        soma+=q*v;
+      });
+      editor.querySelector('.tj-total-itens').textContent='Total dos itens: '+formatarMoedaBR(soma);
+      if(campoTotal)campoTotal.value=soma?soma.toFixed(2):'';
+    }
+    function definirItens(itens){
+      corpo.innerHTML='';
+      var lista=Array.isArray(itens)?itens:[];
+      if(!lista.length)linha({}); else lista.forEach(function(it){linha(it||{});});
+      total();
+    }
+    editor.querySelector('.tj-add-item').addEventListener('click',function(){linha({});total();});
+    editor._tjDefinirItens=definirItens;
+    editor._tjTotal=total;
+    definirItens([]);
+  });
+}
+
+window.TJOrcamentoItens={
+  definir:function(itens){
+    var editor=document.querySelector('#tela-form-novo-orcamento .tj-editor-itens');
+    if(editor&&typeof editor._tjDefinirItens==='function')editor._tjDefinirItens(itens||[]);
+  },
+  limpar:function(){this.definir([]);}
+};
+
+function rodaTudo(){
+  try{injetaTrilha();injetaAcoesOrcamento();injetaEditorItens();injetaChips();}catch(e){}
+}
+var agenda;
+new MutationObserver(function(){clearTimeout(agenda);agenda=setTimeout(rodaTudo,120);})
+  .observe(document.documentElement,{childList:true,subtree:true});
+rodaTudo();
+})();
+</script>
+<!-- ===== FIM DOS AJUSTES TJ ===== -->
+
+<!-- ===== TJ ANEXOS MOBILE: SELEÇÃO REAL DE FOTOS E VÍDEOS ===== -->
+<script>
+(function(){
+  'use strict';
+
+  var anexos = { fotos: [], videos: [] };
+  window.TJAnexosSelecionados = anexos;
+
+  function tamanhoLegivel(bytes){
+    if(!bytes) return '0 KB';
+    var mb = bytes / (1024 * 1024);
+    if(mb >= 1) return mb.toFixed(mb >= 10 ? 0 : 1) + ' MB';
+    return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+
+  function escapar(txt){
+    return String(txt || '').replace(/[&<>"']/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function renderizar(){
+    var box = document.getElementById('anexos-preview');
+    if(!box) return;
+    var todos = anexos.fotos.concat(anexos.videos);
+    if(!todos.length){
+      box.textContent = 'Nenhum arquivo selecionado.';
+      return;
+    }
+    var linhas = [];
+    if(anexos.fotos.length) linhas.push('<strong>📷 Fotos:</strong> ' + anexos.fotos.length);
+    if(anexos.videos.length) linhas.push('<strong>🎥 Vídeo:</strong> ' + anexos.videos.length);
+    todos.forEach(function(f){
+      linhas.push('• ' + escapar(f.name) + ' (' + tamanhoLegivel(f.size) + ')');
+    });
+    box.innerHTML = linhas.join('<br>');
+  }
+
+  function adicionarArquivos(tipo, lista){
+    var recebidos = Array.prototype.slice.call(lista || []);
+    if(!recebidos.length) return;
+
+    if(tipo === 'foto'){
+      recebidos = recebidos.filter(function(f){ return !f.type || f.type.indexOf('image/') === 0; });
+      anexos.fotos = recebidos;
+      if(typeof toast === 'function') toast(recebidos.length === 1 ? 'Foto selecionada.' : recebidos.length + ' fotos selecionadas.');
+    } else {
+      recebidos = recebidos.filter(function(f){ return !f.type || f.type.indexOf('video/') === 0; });
+      anexos.videos = recebidos.slice(0,1);
+      if(typeof toast === 'function') toast(anexos.videos.length ? 'Vídeo selecionado.' : 'Selecione um arquivo de vídeo válido.');
+    }
+    renderizar();
+  }
+
+  window.TJAbrirSeletorAnexo = function(tipo){
+    var input = document.getElementById(tipo === 'video' ? 'input-anexo-video' : 'input-anexo-foto');
+    if(input && typeof input.showPicker === 'function'){
+      try{ input.showPicker(); }catch(e){}
+    }
+  };
+
+  window.TJLimparAnexosNovoChamado = function(){
+    anexos.fotos = [];
+    anexos.videos = [];
+    var foto = document.getElementById('input-anexo-foto');
+    var video = document.getElementById('input-anexo-video');
+    if(foto) foto.value = '';
+    if(video) video.value = '';
+    renderizar();
+  };
+
+  document.addEventListener('click',function(ev){
+    if(!ev.target) return;
+    if(ev.target.id === 'input-anexo-foto' || ev.target.id === 'input-anexo-video'){
+      // Não cancela o clique: ele precisa continuar até o seletor nativo do sistema.
+      ev.target.value = '';
+    }
+  },true);
+
+  document.addEventListener('change',function(ev){
+    if(!ev.target) return;
+    if(ev.target.id === 'input-anexo-foto'){
+      adicionarArquivos('foto', ev.target.files);
+    } else if(ev.target.id === 'input-anexo-video'){
+      adicionarArquivos('video', ev.target.files);
+    }
+  },true);
+})();
+</script>
+<!-- ===== FIM TJ ANEXOS MOBILE ===== -->
+
+<!-- ===== TJ FIREBASE: AUTENTICAÇÃO, SESSÃO E PERSISTÊNCIA ===== -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+'use strict';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCrnT_iyjRbDgvo8Gea-H7pCd4j1ZpHCWk",
+  authDomain: "tj-refrigeracao.firebaseapp.com",
+  projectId: "tj-refrigeracao",
+  storageBucket: "tj-refrigeracao.firebasestorage.app",
+  messagingSenderId: "1050981849867",
+  appId: "1:1050981849867:web:c17ce7e4540d5076c7200e"
+};
+
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+window.TJFB = { auth: auth, db: db };
+
+function aviso(msg){
+  if (typeof toast === 'function') toast(msg); else console.log('[TJFB]', msg);
+}
+function msgErro(e){
+  const c=(e&&e.code)||'';
+  if(c==='auth/email-already-in-use') return 'Este e-mail já tem uma conta. Faça login.';
+  if(c==='auth/invalid-email') return 'E-mail inválido.';
+  if(c==='auth/weak-password') return 'A senha precisa ter pelo menos 6 caracteres.';
+  if(c==='auth/user-not-found'||c==='auth/wrong-password'||c==='auth/invalid-credential') return 'E-mail ou senha incorretos.';
+  if(c==='auth/too-many-requests') return 'Muitas tentativas. Aguarde um momento e tente novamente.';
+  if(c==='auth/operation-not-allowed') return 'O login por e-mail/senha ainda não foi ativado no Firebase.';
+  if(c==='permission-denied'||c==='firestore/permission-denied') return 'Sem permissão no Firestore. Verifique as regras de segurança.';
+  return (e&&e.message)||'Erro inesperado.';
+}
+function guardaSessao(user,tipo){
+  try{ localStorage.setItem('tj_sessao',JSON.stringify({uid:user.uid,email:user.email||'',tipo:tipo||'cliente'})); }catch(e){}
+}
+function limpaSessao(){
+  try{ localStorage.removeItem('tj_sessao'); }catch(e){}
+}
+function telaLogin(){
+  var landing=document.getElementById('tj-landing');
+  if(landing) landing.classList.add('hidden');
+  document.getElementById('auth-container').classList.remove('hidden');
+  document.getElementById('painel-principal').classList.add('hidden');
+  document.getElementById('tela-empresa-senha').classList.add('hidden');
+  document.getElementById('tela-cadastro').classList.add('hidden');
+  document.getElementById('tela-login').classList.remove('hidden');
+}
+function atualizarIdentidadeCliente(perfil){
+  perfil=perfil||{};
+  var nome=perfil.nome||perfil.empresa||perfil.razaoSocial||perfil.email||clienteAtualNome||"Cliente";
+  clienteAtualNome=nome;
+  var saudacao=document.querySelector("#tela-cli-dash h2");
+  if(saudacao) saudacao.textContent="Olá, "+nome+" 👋";
+  var nomeInput=document.getElementById("cli-perfil-nome");
+  if(nomeInput) nomeInput.value=perfil.nome||nome;
+  var empresaInput=document.getElementById("cli-perfil-empresa");
+  if(empresaInput) empresaInput.value=perfil.empresa||perfil.razaoSocial||((perfil.tipoPessoa==='PJ')?nome:"");
+  var emailInput=document.getElementById("cli-perfil-email");
+  if(emailInput) emailInput.value=perfil.email||((window.TJFB&&window.TJFB.auth&&window.TJFB.auth.currentUser&&window.TJFB.auth.currentUser.email)||"");
+  var telInput=document.getElementById("cli-perfil-tel");
+  if(telInput) telInput.value=perfil.telefone||perfil.tel||"";
+  var detCli=document.getElementById("det-cli-cliente");
+  if(detCli) detCli.textContent=nome;
+  var detOrc=document.getElementById("det-orc-cliente");
+  if(detOrc) detOrc.textContent="Cliente: "+nome;
+}
+
+function atualizarIdentidadeEmpresa(perfil){
+  perfil=perfil||{};
+  var nome=perfil.nome||perfil.empresa||perfil.razaoSocial||"Proprietário";
+  var saudacao=document.getElementById("emp-saudacao");
+  if(saudacao) saudacao.textContent="Olá, "+nome+" 👋";
+}
+
+function telaApp(tipo){
+  var landing=document.getElementById('tj-landing');
+  if(landing) landing.classList.add('hidden');
+  state.perfilSessao=tipo;
+  if(tipo==='cliente') atualizarIdentidadeCliente(window.TJFB&&window.TJFB.perfilCliente||{});
+  else atualizarIdentidadeEmpresa(window.TJFB&&window.TJFB.perfilEmpresa||{});
+  document.getElementById('auth-container').classList.add('hidden');
+  document.getElementById('painel-principal').classList.remove('hidden');
+  const bell=document.getElementById('btn-bell-notif');
+  if(bell) bell.style.display=tipo==='cliente'?'flex':'none';
+  historicoNavegacao=[];
+  abrirTela(tipo==='empresa'?'tela-emp-dash':'tela-cli-dash',false);
+}
+function profileRef(uid){ return db.collection('users').doc(uid); }
+function clientRef(uid){ return db.collection('clients').doc(uid); }
+
+async function carregarPerfil(user){
+  let perfil=null;
+  try{
+    const u=await profileRef(user.uid).get();
+    if(u.exists) perfil=u.data();
+  }catch(e){ console.warn('[TJFB] users:',e); }
+  if(!perfil){
+    try{
+      const c=await clientRef(user.uid).get();
+      if(c.exists) perfil=c.data();
+    }catch(e){ console.warn('[TJFB] clients:',e); }
+  }
+  return perfil||{};
+}
+
+let clienteBase=null;
+let clienteDadosUid='';
+let clienteConflito=false;
+let clienteFila=Promise.resolve();
+function copiarDados(v){return JSON.parse(JSON.stringify(v));}
+function limparDadosCliente(){
+  ['chamados','orcamentos','equip','pedidos','historicoCliente','notificacoesCliente','contatosCliente','enderecosCliente','agendamentos'].forEach(function(k){state[k]=[];});
+  state.mensagens={};state.atendimentos={};
+}
+function definirBaseCliente(user){
+  clienteDadosUid=user.uid;
+  clienteAtualUid=user.uid;
+  clienteConflito=false;
+  clienteBase=copiarDados(snapshotCliente());
+  delete clienteBase.atualizadoEm;
+}
+async function carregarDadosCliente(user,perfil){
+  clienteBase=null;clienteDadosUid='';limparDadosCliente();
+  try{
+    const snap=await db.collection('clientData').doc(user.uid).get();
+    if(auth.currentUser?.uid!==user.uid)return false;
+    if(!snap.exists){
+      // Conta nova: nunca mostrar os dados fictícios do protótipo.
+      state.chamados=[];
+      state.mensagens={};
+      state.atendimentos={};
+      state.orcamentos=[];
+      state.equip=[];
+      state.pedidos=[];
+      state.historicoCliente=[];
+      state.notificacoesCliente=[];
+      state.contatosCliente=[];
+      state.enderecosCliente=[];
+      state.agendamentos=[];
+      definirBaseCliente(user);
+      return true;
+    }
+    const d=snap.data()||{};
+    state.chamados=Array.isArray(d.chamados)?d.chamados:[];
+    state.mensagens=d.mensagens||{};
+    state.atendimentos=d.atendimentos||{};
+    state.orcamentos=Array.isArray(d.orcamentos)?d.orcamentos:[];
+    state.equip=Array.isArray(d.equip)?d.equip:[];
+    state.pedidos=Array.isArray(d.pedidos)?d.pedidos:[];
+    state.historicoCliente=Array.isArray(d.historicoCliente)?d.historicoCliente:[];
+    state.notificacoesCliente=Array.isArray(d.notificacoesCliente)?d.notificacoesCliente:[];
+    state.contatosCliente=Array.isArray(d.contatosCliente)?d.contatosCliente:[];
+    state.enderecosCliente=Array.isArray(d.enderecosCliente)?d.enderecosCliente:[];
+    state.agendamentos=Array.isArray(d.agendamentos)?d.agendamentos:[];
+    definirBaseCliente(user);
+    return true;
+  }catch(e){ limparDadosCliente();clienteBase=null;clienteDadosUid='';throw e; }
+}
+
+
+async function carregarDadosEmpresaFirebase(){
+  if(!window.TJFB || !window.TJFB.db || !window.TJFB.auth || !window.TJFB.auth.currentUser) return [];
+  try{
+    // V14: cruza clients + users + clientData para nunca exibir UID como nome do cliente.
+    const [snapClients,snapUsers,snapData]=await Promise.all([
+      db.collection('clients').get(),
+      db.collection('users').get(),
+      db.collection('clientData').get()
+    ]);
+
+    const cadastros={}, perfis={}, nomes={};
+    snapClients.forEach(function(doc){
+      const c=doc.data()||{};
+      cadastros[doc.id]=c;
+      const n=c.nome||c.empresa||c.razaoSocial||c.email||'';
+      if(n && n!==doc.id) nomes[doc.id]=n;
+    });
+    snapUsers.forEach(function(doc){
+      const u=doc.data()||{};
+      perfis[doc.id]=u;
+      const n=u.nome||u.empresa||u.razaoSocial||u.email||'';
+      if(!nomes[doc.id] && n && n!==doc.id) nomes[doc.id]=n;
+    });
+
+    function pareceUid(valor,uid){
+      if(!valor) return true;
+      valor=String(valor).trim();
+      if(!valor) return true;
+      if(uid && valor===uid) return true;
+      // UIDs do Firebase normalmente são sequências longas sem espaços.
+      return valor.length>=20 && !/\s/.test(valor) && /^[A-Za-z0-9_-]+$/.test(valor);
+    }
+    function nomeDentroDosDados(d,uid){
+      const listas=['chamados','orcamentos','equip','pedidos','historicoCliente','notificacoesCliente','contatosCliente','enderecosCliente','agendamentos'];
+      for(let i=0;i<listas.length;i++){
+        const arr=Array.isArray(d[listas[i]])?d[listas[i]]:[];
+        for(let j=0;j<arr.length;j++){
+          const n=arr[j]&&(arr[j].cliente||arr[j].clienteNome||arr[j].nomeCliente);
+          if(n && !pareceUid(n,uid)) return String(n).trim();
+        }
+      }
+      return '';
+    }
+    function resolverNome(uid,d){
+      const c=cadastros[uid]||{}, u=perfis[uid]||{};
+      const candidatos=[nomes[uid],c.nome,c.empresa,c.razaoSocial,u.nome,u.empresa,u.razaoSocial,c.email,u.email,nomeDentroDosDados(d||{},uid)];
+      for(let i=0;i<candidatos.length;i++){
+        if(candidatos[i] && !pareceUid(candidatos[i],uid)) return String(candidatos[i]).trim();
+      }
+      return 'Cliente sem nome cadastrado';
+    }
+
+    const chamados=[], mensagens={}, atendimentos={}, orcamentos=[], equip=[], pedidos=[],
+          historico=[], notificacoes=[], contatos=[], enderecos=[], agendamentos=[];
+    snapData.forEach(function(doc){
+      const d=doc.data()||{}, uid=doc.id, nome=resolverNome(uid,d);
+      nomes[uid]=nome;
+      (Array.isArray(d.chamados)?d.chamados:[]).forEach(function(x){ chamados.push(Object.assign({},x,{clienteUid:uid,cliente:nome})); });
+      Object.keys(d.mensagens||{}).forEach(function(k){ mensagens[k]=d.mensagens[k]; });
+      Object.keys(d.atendimentos||{}).forEach(function(k){ atendimentos[k]=Object.assign({},d.atendimentos[k]||{},{clienteUid:uid,cliente:nome}); });
+      (Array.isArray(d.orcamentos)?d.orcamentos:[]).forEach(function(x){ orcamentos.push(Object.assign({},x,{clienteUid:uid,cliente:nome})); });
+      (Array.isArray(d.equip)?d.equip:[]).forEach(function(x){ equip.push(Object.assign({},x,{clienteUid:uid,cliente:nome})); });
+      (Array.isArray(d.pedidos)?d.pedidos:[]).forEach(function(x){ pedidos.push(Object.assign({},x,{clienteUid:uid,cliente:nome})); });
+      (Array.isArray(d.historicoCliente)?d.historicoCliente:[]).forEach(function(x){ historico.push(Object.assign({},x,{clienteUid:uid,cliente:nome})); });
+      (Array.isArray(d.notificacoesCliente)?d.notificacoesCliente:[]).forEach(function(x){ notificacoes.push(Object.assign({},x,{clienteUid:uid,cliente:nome})); });
+      (Array.isArray(d.contatosCliente)?d.contatosCliente:[]).forEach(function(x){ contatos.push(Object.assign({},x,{clienteUid:uid,cliente:nome})); });
+      (Array.isArray(d.enderecosCliente)?d.enderecosCliente:[]).forEach(function(x){ enderecos.push(Object.assign({},x,{clienteUid:uid,cliente:nome})); });
+      (Array.isArray(d.agendamentos)?d.agendamentos:[]).forEach(function(x){ agendamentos.push(Object.assign({},x,{clienteUid:uid,cliente:nome})); });
+    });
+
+    state.chamados=chamados;
+    state.mensagens=mensagens;
+    state.atendimentos=atendimentos;
+    state.orcamentos=orcamentos;
+    state.equip=equip;
+    state.pedidos=pedidos;
+    state.historicoEmpresa=historico;
+    state.notificacoesCliente=notificacoes;
+    state.contatosCliente=contatos;
+    state.enderecosCliente=enderecos;
+    state.agendamentos=agendamentos;
+
+    // Monta a lista de clientes por UID, inclusive cadastros antigos que existam só em users/clientData.
+    const uids={};
+    snapClients.forEach(function(doc){ uids[doc.id]=true; });
+    snapUsers.forEach(function(doc){ const u=doc.data()||{}; if(u.role!=='owner') uids[doc.id]=true; });
+    snapData.forEach(function(doc){ uids[doc.id]=true; });
+    state.clientesFirebase=Object.keys(uids).map(function(uid){
+      const c=cadastros[uid]||{}, u=perfis[uid]||{};
+      const nome=nomes[uid]||resolverNome(uid,{});
+      return {
+        uid:uid,
+        nome:nome,
+        empresa:c.empresa||c.razaoSocial||u.empresa||u.razaoSocial||'',
+        tipo:(c.tipoPessoa||u.tipoPessoa)==='PJ'?'PJ':'PF',
+        tel:c.telefone||c.tel||u.telefone||u.tel||'Não informado',
+        email:c.email||u.email||'Não informado'
+      };
+    }).filter(function(c){ return c.uid!==window.TJFB.auth.currentUser.uid; });
+    state.clientesCadastrados=state.clientesFirebase.slice();
+    window.TJFB.nomesClientesPorUid=nomes;
+    return true;
+  }catch(e){
+    console.error('[TJFB] dados do proprietário',e);
+    aviso('Não foi possível carregar todos os dados dos clientes.');
+    return false;
+  }
+}
+window.TJFB.carregarDadosEmpresaFirebase=carregarDadosEmpresaFirebase;
+
+// V15: converte estruturas antigas com arrays dentro de arrays para um formato aceito pelo Firestore.
+// O Firestore não aceita arrays aninhados, então itens/histórico de orçamento e peças viram objetos.
+window.TJFirestoreSafe=function(payload){
+  payload=payload||{};
+  var out=Object.assign({},payload);
+  function itemOrc(it){
+    if(Array.isArray(it)) return {descricao:String(it[0]||''),qtd:String(it[1]||''),valor:String(it[2]||'')};
+    it=it||{};
+    return {descricao:String(it.descricao||it.item||it.nome||''),qtd:String(it.qtd||it.quantidade||''),valor:String(it.valor||it.preco||'')};
+  }
+  function histOrc(h){
+    if(Array.isArray(h)) return {data:String(h[0]||''),evento:String(h[1]||'')};
+    h=h||{};
+    return {data:String(h.data||''),evento:String(h.evento||h.texto||h.descricao||'')};
+  }
+  function pecaAtend(p){
+    if(Array.isArray(p)) return {descricao:String(p[0]||''),qtd:String(p[1]||''),valor:String(p[2]||'')};
+    p=p||{};
+    return {descricao:String(p.descricao||p.item||p.nome||''),qtd:String(p.qtd||p.quantidade||''),valor:String(p.valor||p.preco||'')};
+  }
+  if(Array.isArray(out.orcamentos)){
+    out.orcamentos=out.orcamentos.map(function(o){
+      o=Object.assign({},o||{});
+      o.itens=(Array.isArray(o.itens)?o.itens:[]).map(itemOrc);
+      o.hist=(Array.isArray(o.hist)?o.hist:[]).map(histOrc);
+      return o;
+    });
+  }
+  if(out.atendimentos && typeof out.atendimentos==='object' && !Array.isArray(out.atendimentos)){
+    var ats={};
+    Object.keys(out.atendimentos).forEach(function(k){
+      var a=Object.assign({},out.atendimentos[k]||{});
+      a.pecas=(Array.isArray(a.pecas)?a.pecas:[]).map(pecaAtend);
+      ats[k]=a;
+    });
+    out.atendimentos=ats;
+  }
+  return out;
+};
+
+function snapshotCliente(){
+  const nome=clienteAtualNome;
+  const uid=auth.currentUser&&auth.currentUser.uid;
+  function own(arr){return Array.isArray(arr)?arr.filter(function(x){return x.clienteUid?x.clienteUid===uid:(!x.cliente || x.cliente===nome);}):[];}
+  const nums=own(state.chamados).map(function(x){return x.num;});
+  const msgs={}; nums.forEach(function(n){ if(state.mensagens&&state.mensagens[n]) msgs[n]=state.mensagens[n]; });
+  const ats={}; nums.forEach(function(n){ if(state.atendimentos&&state.atendimentos[n]) ats[n]=state.atendimentos[n]; });
+  const snap={
+    chamados:own(state.chamados), chamadoIds:nums.map(String), mensagens:msgs, atendimentos:ats,
+    orcamentos:own(state.orcamentos), equip:own(state.equip), pedidos:own(state.pedidos),
+    historicoCliente:Array.isArray(state.historicoCliente)?state.historicoCliente:[],
+    notificacoesCliente:Array.isArray(state.notificacoesCliente)?state.notificacoesCliente:[],
+    contatosCliente:Array.isArray(state.contatosCliente)?state.contatosCliente:[],
+    enderecosCliente:Array.isArray(state.enderecosCliente)?state.enderecosCliente:[],
+    agendamentos:Array.isArray(state.agendamentos)?state.agendamentos:[]
+  };
+  const safe=window.TJFirestoreSafe?window.TJFirestoreSafe(snap):snap;
+  safe.atualizadoEm=firebase.firestore.FieldValue.serverTimestamp();
+  return safe;
+}
+let saveTimer=null;
+async function gravarAlteracoesCliente(){
+  const user=auth.currentUser;
+  if(!user||state.perfilSessao!=='cliente'||clienteDadosUid!==user.uid||!clienteBase)
+    throw new Error('Os dados ainda não foram carregados. Entre novamente.');
+  if(clienteConflito) throw new Error('Os dados foram alterados em outra sessão. Recarregue antes de continuar.');
+  const uid=user.uid;
+  const atual=copiarDados(snapshotCliente());delete atual.atualizadoEm;
+  const base=copiarDados(clienteBase);
+  const chaves=Object.keys(atual).filter(function(k){return !window.TJCore.equal(atual[k],base[k]);});
+  if(!chaves.length)return;
+  const mensagemChaves=Array.from(new Set(Object.keys(atual.mensagens||{}).concat(Object.keys(base.mensagens||{}))))
+    .filter(function(k){return !window.TJCore.equal((atual.mensagens||{})[k],(base.mensagens||{})[k]);});
+  if(mensagemChaves.length>1)throw new Error('Envie as mensagens de um chamado por vez.');
+  await db.runTransaction(async function(tx){
+    const perfil=await tx.get(profileRef(uid));
+    const ref=db.collection('clientData').doc(uid);
+    const snap=await tx.get(ref);
+    if(!auth.currentUser||auth.currentUser.uid!==uid||clienteDadosUid!==uid)throw new Error('Sessão alterada.');
+    if(!perfil.exists||perfil.data().active!==true)throw new Error('Acesso desativado.');
+    const dadosRemotos=snap.exists?(snap.data()||{}):{};
+    if(chaves.includes('chamados')&&(dadosRemotos.chamados||[]).length&&!Array.isArray(dadosRemotos.chamadoIds))throw new Error('O cadastro de chamados precisa ser atualizado pela TJ antes de novas solicitações.');
+    const remoto=window.TJFirestoreSafe?window.TJFirestoreSafe(dadosRemotos):dadosRemotos;
+    const patch={};
+    chaves.forEach(function(k){
+      const anterior=Object.prototype.hasOwnProperty.call(remoto,k)?remoto[k]:(Array.isArray(base[k])?[]:{});
+      if(!window.TJCore.equal(anterior,base[k])){
+        const erro=new Error('Os dados foram atualizados em outra sessão. Recarregue antes de continuar.');
+        erro.code='tj/conflito';throw erro;
+      }
+      patch[k]=atual[k];
+    });
+    patch.atualizadoEm=firebase.firestore.FieldValue.serverTimestamp();
+    patch.clienteMutation={mensagemChamado:mensagemChaves[0]||''};
+    tx.set(ref,patch,{merge:true});
+  });
+  if(clienteDadosUid===uid&&clienteBase)chaves.forEach(function(k){clienteBase[k]=atual[k];});
+}
+function salvarClienteAgora(){
+  clearTimeout(saveTimer);
+  const uid=auth.currentUser&&auth.currentUser.uid;
+  const tarefa=clienteFila.then(function(){
+    if(!uid||!auth.currentUser||auth.currentUser.uid!==uid)throw new Error('Sessão expirada.');
+    return gravarAlteracoesCliente();
+  });
+  clienteFila=tarefa.catch(function(e){
+    console.warn('[TJFB] persistência:',e);
+    if(e.code==='tj/conflito')clienteConflito=true;
+  });
+  return tarefa;
+}
+function salvarDadosCliente(){
+  if(!auth.currentUser||state.perfilSessao!=='cliente'||!clienteBase||clienteConflito)return;
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(function(){salvarClienteAgora().catch(function(e){aviso('Alterações não salvas: '+e.message);});},350);
+}
+window.TJFB.salvarDadosCliente=salvarDadosCliente;
+window.TJFB.salvarClienteAgora=salvarClienteAgora;
+window.TJFB.atualizarDadosCliente=async function(){var user=auth.currentUser;if(!user)throw Error('Sessão expirada.');await salvarClienteAgora();if(auth.currentUser?.uid!==user.uid)throw Error('Sessão alterada.');await carregarDadosCliente(user,window.TJFB.perfilCliente);};
+let decidindoOrcamento=false;
+window.TJFB.decidirOrcamento=async function(num,tipo,msg){
+  if(decidindoOrcamento)return;
+  const user=auth.currentUser;
+  if(!user||state.perfilSessao!=='cliente'||clienteDadosUid!==user.uid){aviso('Entre novamente antes de decidir.');return;}
+  const orc=state.orcamentos.find(function(o){return String(o.num)===String(num);});
+  if(!orc||orc.status!=='Aguardando aprovação'){aviso('Somente orçamentos pendentes podem receber uma decisão.');return;}
+  if(!['aprovado','recusado','esclarecimento'].includes(tipo))return;
+  if(tipo==='esclarecimento'&&(!String(msg||'').trim()||String(msg).length>2000)){aviso('Informe sua dúvida em até 2.000 caracteres.');return;}
+  decidindoOrcamento=true;
+  try{await salvarClienteAgora();}catch(e){decidindoOrcamento=false;aviso('Decisão não salva: '+e.message);return;}
+  const anterior=copiarDados(orc),data=new Date().toLocaleDateString('pt-BR');
+  let historico=null;
+  if(tipo==='esclarecimento')orc.esclarecimento=String(msg).trim();
+  else{
+    orc.status=tipo==='aprovado'?'Aprovado':'Recusado';
+    orc[tipo==='aprovado'?'aprovadoEm':'recusadoEm']=data;
+    orc.hist=Array.isArray(orc.hist)?orc.hist:[];
+    orc.hist.push({data:data,evento:orc.status+' pelo cliente'});
+    historico={data:data,tipo:'orcamento',titulo:'Orçamento #'+num+' '+orc.status.toLowerCase(),desc:'Orçamento '+orc.status.toLowerCase()+' pelo cliente',status:orc.status};
+    state.historicoCliente.unshift(historico);
+  }
+  try{await salvarClienteAgora();aviso(tipo==='esclarecimento'?'Pedido de esclarecimento salvo.':'Decisão salva com sucesso.');if(auth.currentUser&&auth.currentUser.uid===user.uid)renderizarDetalheOrcamento();}
+  catch(e){if(clienteDadosUid===user.uid){const idx=state.orcamentos.indexOf(orc);if(idx>=0)state.orcamentos[idx]=anterior;if(historico)state.historicoCliente=state.historicoCliente.filter(function(h){return h!==historico;});}aviso('Decisão não salva: '+e.message);}
+  finally{decidindoOrcamento=false;}
+};
+document.addEventListener('click',function(ev){
+  const alvo=ev.target.closest&&ev.target.closest('[data-action]');if(!alvo||state.perfilSessao!=='cliente')return;
+  const acao=alvo.dataset.action;
+  if(['aprovar-orc','aprovar-orcamento','recusar-orc','recusar-orcamento'].includes(acao)){
+    ev.preventDefault();ev.stopImmediatePropagation();
+    window.TJFB.decidirOrcamento(alvo.dataset.id||orcamentoAtualNum,acao.startsWith('aprovar')?'aprovado':'recusado','');
+  }
+  if(acao==='ler-notific'){
+    ev.preventDefault();ev.stopImmediatePropagation();
+    (async function(){try{for(const n of state.notificacoesCliente){if(n.lida===true)continue;const old=n.lida;n.lida=true;try{await salvarClienteAgora();}catch(e){n.lida=old;throw e;}}atualizarBadgeNotificacoes();renderizarNotificacoesCliente();aviso('Notificações atualizadas.');}catch(e){aviso('Não foi possível marcar todas as notificações: '+e.message);}})();
+  }
+},true);
+let enviandoChamado=false;
+window.TJFB.enviarChamadoCliente=async function(){
+  if(enviandoChamado)return;
+  const user=auth.currentUser;
+  if(!user||state.perfilSessao!=='cliente'||clienteDadosUid!==user.uid||!clienteBase||clienteConflito){aviso('Recarregue e entre novamente antes de enviar.');return;}
+  const equipamento=(document.getElementById('novo-chamado-equip')?.value||'').trim();
+  const problema=(document.getElementById('novo-chamado-prob')?.value||'').trim();
+  if(!equipamento||!problema){aviso('Selecione o equipamento e descreva o problema.');return;}
+  const anexos=window.TJAnexosSelecionados;
+  if(anexos&&(anexos.fotos.length||anexos.videos.length)){aviso('O envio de anexos ainda não está disponível. Remova os arquivos para enviar o chamado.');return;}
+  const num=String(Date.now())+String(Math.floor(Math.random()*1000000)).padStart(6,'0');
+  const data=new Date().toLocaleDateString('pt-BR');
+  const local=(state.enderecosCliente||[]).find(function(e){return e.tipo==='Atendimento';})||(state.enderecosCliente||[])[0];
+  const endereco=local?[local.rua,local.num,local.cidade].filter(Boolean).join(', '):'';
+  const registro={num:num,equip:equipamento,cliente:clienteAtualNome,clienteUid:user.uid,problema:problema,status:'Aguardando início',agend:'Aguardando agendamento',criadoEm:new Date().toISOString()};
+  const historico={data:data,tipo:'chamado',titulo:'Chamado #'+num+' aberto',desc:equipamento+' — '+problema,status:'Aberto'};
+  enviandoChamado=true;
+  const botoes=document.querySelectorAll('[data-action="enviar-chamado"],[data-action="enviar-novo-chamado"]');
+  botoes.forEach(function(b){b.disabled=true;});
+  try{await salvarClienteAgora();}catch(e){enviandoChamado=false;botoes.forEach(function(b){b.disabled=false;});aviso('Chamado não enviado: '+e.message);return;}
+  state.chamados.unshift(registro);
+  state.mensagens[num]=[{autor:'cliente',texto:problema,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}];
+  state.atendimentos[num]={endereco:endereco,previsao:'Aguardando confirmação',diag:'',pecas:[]};
+  state.historicoCliente.unshift(historico);
+  try{
+    await salvarClienteAgora();
+    if(!auth.currentUser||auth.currentUser.uid!==user.uid)return;
+    chamadoAtualNum=num;
+    document.getElementById('novo-chamado-prob').value='';
+    aviso('Chamado salvo com sucesso! Nº '+num);
+    abrirTela('tela-cli-detalhe-chamado');
+  }catch(e){
+    if(clienteDadosUid===user.uid){
+      state.chamados=state.chamados.filter(function(c){return c!==registro;});
+      delete state.mensagens[num];delete state.atendimentos[num];
+      state.historicoCliente=state.historicoCliente.filter(function(h){return h!==historico;});
+    }
+    aviso('Chamado não enviado: '+e.message);
+  }finally{enviandoChamado=false;botoes.forEach(function(b){b.disabled=false;});}
+};
+
+let cadastroEmAndamento=false;
+async function fazerCadastro(){
+  const nome=(document.getElementById('cad-nome')?.value||'').trim();
+  const telefone=(document.getElementById('cad-tel')?.value||'').trim();
+  const email=(document.getElementById('cad-email')?.value||'').trim();
+  const senha=document.getElementById('cad-senha')?.value||'';
+  const senha2=document.getElementById('cad-senha2')?.value||'';
+  if(!nome||!telefone||!email||!senha||!senha2){ aviso('Preencha todos os campos obrigatórios.'); return; }
+  if(!email.includes('@')){ aviso('Informe um e-mail válido.'); return; }
+  if(senha.length<6){ aviso('A senha precisa ter pelo menos 6 caracteres.'); return; }
+  if(senha!==senha2){ aviso('As senhas não conferem.'); return; }
+  try{
+    cadastroEmAndamento=true;
+    const cred=await auth.createUserWithEmailAndPassword(email,senha);
+    const tipoPessoa=(typeof tipoCadastroSelecionado!=='undefined'&&tipoCadastroSelecionado==='pj')?'PJ':'PF';
+    const dados={uid:cred.user.uid,email:email,tipoPessoa:tipoPessoa,nome:nome,telefone:telefone,active:true,criadoEm:firebase.firestore.FieldValue.serverTimestamp()};
+    const cadastroBatch=db.batch();
+    cadastroBatch.set(clientRef(cred.user.uid),dados,{merge:true});
+    cadastroBatch.set(profileRef(cred.user.uid),{uid:cred.user.uid,email:email,role:'cliente',nome:nome,tipoPessoa:tipoPessoa,active:true,criadoEm:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    await cadastroBatch.commit();
+    clienteAtualNome=nome;
+    window.TJFB.perfilCliente=dados;
+    atualizarIdentidadeCliente(dados);
+    state.perfilSessao='cliente';
+    guardaSessao(cred.user,'cliente');
+    await carregarDadosCliente(cred.user,dados);
+    aviso('Conta criada com sucesso!');
+    telaApp('cliente');
+  }catch(e){ console.error('[TJFB] cadastro',e); aviso(msgErro(e)); }
+  finally{cadastroEmAndamento=false;}
+}
+
+async function cadastrarClientePeloProprietario(){
+  if(!auth.currentUser || !window.TJFB || !window.TJFB.perfilEmpresa || window.TJFB.perfilEmpresa.role!=='owner'){
+    aviso('Acesso restrito ao proprietário.');
+    return;
+  }
+
+  const tipo=(document.getElementById('emp-cli-tipo')?.value||'PF').toUpperCase()==='PJ'?'PJ':'PF';
+  const nome=(document.getElementById('emp-cli-nome')?.value||'').trim();
+  const telefone=(document.getElementById('emp-cli-tel')?.value||'').trim();
+  const email=(document.getElementById('emp-cli-email')?.value||'').trim().toLowerCase();
+  const btn=document.getElementById('btn-salvar-cliente-empresa');
+
+  if(!nome||!telefone||!email){ aviso('Preencha nome, telefone e e-mail.'); return; }
+  if(!email.includes('@')){ aviso('Informe um e-mail válido.'); return; }
+
+  var appSec=null;
+  try{
+    if(btn){ btn.disabled=true; btn.textContent='CADASTRANDO...'; }
+
+    // App Firebase secundário: cria a conta do cliente sem trocar a sessão do proprietário.
+    appSec=firebase.apps.find(function(a){ return a.name==='TJ_OWNER_CLIENT_CREATE'; }) || firebase.initializeApp(firebaseConfig,'TJ_OWNER_CLIENT_CREATE');
+    const authSec=appSec.auth();
+    const dbSec=appSec.firestore();
+    try{ await authSec.signOut(); }catch(e){}
+
+    var bytes=new Uint32Array(4);
+    if(window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes);
+    else { for(var b=0;b<bytes.length;b++) bytes[b]=Math.floor(Math.random()*4294967295); }
+    const senhaTemp='Tj!'+Array.from(bytes).map(function(n){return n.toString(36);}).join('').slice(0,18)+'9a';
+
+    const cred=await authSec.createUserWithEmailAndPassword(email,senhaTemp);
+    const uid=cred.user.uid;
+    const dadosCliente={
+      uid:uid,
+      email:email,
+      tipoPessoa:tipo,
+      nome:nome,
+      telefone:telefone,
+      active:true,
+      criadoPor:'proprietario',
+      criadoEm:firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    await db.collection('clients').doc(uid).set(dadosCliente,{merge:true});
+    await db.collection('users').doc(uid).set({
+      uid:uid,
+      email:email,
+      role:'cliente',
+      nome:nome,
+      tipoPessoa:tipo,
+      active:true,
+      criadoPor:'proprietario',
+      criadoEm:firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true});
+
+    var emailSenhaEnviado=true;
+    try{ await authSec.sendPasswordResetEmail(email); }
+    catch(mailErr){ emailSenhaEnviado=false; console.warn('[TJFB] reset novo cliente',mailErr); }
+    try{ await authSec.signOut(); }catch(e){}
+
+    await carregarDadosEmpresaFirebase();
+    await carregarClientesEmpresaFirebase();
+    abrirTela('tela-emp-clientes',false);
+    if(emailSenhaEnviado) aviso('Cliente cadastrado. Enviamos um e-mail para ele definir a senha.');
+    else aviso('Cliente cadastrado. O e-mail de senha não foi enviado; peça para usar “Esqueci minha senha” no login.');
+  }catch(e){
+    console.error('[TJFB] cadastro pelo proprietário',e);
+    aviso(msgErro(e));
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='CADASTRAR CLIENTE'; }
+  }
+}
+window.TJFB.cadastrarClientePeloProprietario=cadastrarClientePeloProprietario;
+
+async function fazerLoginCliente(email,senha){
+  if(!email||!senha){ aviso('Preencha e-mail e senha.'); return; }
+  try{
+    try{ localStorage.removeItem('tj_login_intencao'); }catch(e){}
+    const cred=await auth.signInWithEmailAndPassword(email,senha);
+    const perfil=await carregarPerfil(cred.user);
+    if(perfil && perfil.active===false){
+      await auth.signOut();
+      aviso('Este acesso foi desativado pela TJ Refrigeração.');
+      return;
+    }
+
+    // Login único: a role do Firestore decide automaticamente qual painel abrir.
+    if(perfil.role==='owner'){
+      window.TJFB.perfilEmpresa=perfil;
+      guardaSessao(cred.user,'empresa');
+      await carregarDadosEmpresaFirebase();
+      telaApp('empresa');
+      aviso('Acesso do proprietário autorizado.');
+      return;
+    }
+
+    clienteAtualNome=perfil.nome||perfil.empresa||email;
+    window.TJFB.perfilCliente=perfil;
+    atualizarIdentidadeCliente(perfil);
+    guardaSessao(cred.user,'cliente');
+    await carregarDadosCliente(cred.user,perfil);
+    telaApp('cliente');
+    aviso('Login realizado com sucesso.');
+  }catch(e){ console.error('[TJFB] login',e); aviso(msgErro(e)); }
+}
+
+async function fazerLoginEmpresa(email,senha){
+  if(!email||!senha){ aviso('Informe o e-mail e a senha do proprietário.'); return; }
+  try{
+    try{ localStorage.setItem('tj_login_intencao','empresa'); }catch(e){}
+    const cred=await auth.signInWithEmailAndPassword(email,senha);
+    const perfil=await carregarPerfil(cred.user);
+    if(perfil.role!=='owner'){
+      await auth.signOut();
+      aviso('Esta conta não possui permissão de proprietário.');
+      return;
+    }
+    window.TJFB.perfilEmpresa=perfil;
+    guardaSessao(cred.user,'empresa');
+    telaApp('empresa');
+    try{ localStorage.removeItem('tj_login_intencao'); }catch(e){}
+    aviso('Acesso do proprietário autorizado.');
+  }catch(e){ console.error('[TJFB] login empresa',e); aviso(msgErro(e)); }
+}
+
+async function recuperarSenha(){
+  const email=(document.getElementById('login-email')?.value||'').trim();
+  if(!email){ aviso('Digite seu e-mail no campo de login primeiro.'); return; }
+  try{ await auth.sendPasswordResetEmail(email); aviso('Enviamos o link de redefinição para o seu e-mail.'); }
+  catch(e){ aviso(msgErro(e)); }
+}
+window.TJFB.recoverPassword=recuperarSenha;
+window.TJFB.alterarSenha=async function(novaSenha){
+  const user=auth.currentUser;
+  if(!user) throw new Error('Sessão expirada. Faça login novamente.');
+  await user.updatePassword(novaSenha);
+};
+
+// Intercepta somente ações de autenticação. O restante do app continua usando o despachante existente.
+document.addEventListener('click',function(ev){
+  const alvo=ev.target.closest&&ev.target.closest('button,a,[role="button"]');
+  if(!alvo) return;
+  const acao=alvo.getAttribute('data-action')||'';
+  if(acao==='abrir-cadastro') return;
+  if(acao==='concluir-cadastro'){
+    ev.preventDefault(); ev.stopImmediatePropagation(); fazerCadastro(); return;
+  }
+  if(acao==='salvar-cliente-empresa' && !(document.getElementById('emp-cli-uid') && document.getElementById('emp-cli-uid').value)){
+    ev.preventDefault(); ev.stopImmediatePropagation(); cadastrarClientePeloProprietario(); return;
+  }
+  if(acao==='entrar-cliente'){
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    fazerLoginCliente((document.getElementById('login-email')?.value||'').trim(),(document.getElementById('login-senha')?.value||'').trim()); return;
+  }
+  if(acao==='entrar-empresa'){
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    fazerLoginEmpresa((document.getElementById('email-empresa-input')?.value||'').trim(),(document.getElementById('senha-empresa-input')?.value||'').trim()); return;
+  }
+  if(acao==='esqueci-senha'){
+    ev.preventDefault(); ev.stopImmediatePropagation(); recuperarSenha(); return;
+  }
+},true);
+
+document.addEventListener('input',function(ev){
+  if(state.perfilSessao==='cliente' && ev.target && ev.target.closest && ev.target.closest('#painel-principal')) salvarDadosCliente();
+},true);
+
+// Verifica alterações locais; dados sem mudanças não geram escritas no banco.
+setInterval(salvarDadosCliente,4000);
+
+auth.onAuthStateChanged(async function(user){
+  if(cadastroEmAndamento)return;
+  if(!user){
+    clearTimeout(saveTimer);clienteBase=null;clienteDadosUid='';clienteConflito=false;
+    clienteAtualUid='';state.perfilSessao=null;limparDadosCliente();
+    limpaSessao();
+    try{ localStorage.removeItem('tj_login_intencao'); }catch(e){}
+    window.TJFB.perfilCliente={};
+    window.TJFB.perfilEmpresa={};
+    clienteAtualNome='';
+    if(typeof TJMostrarLanding==='function') TJMostrarLanding(); else telaLogin();
+    return;
+  }
+  try{
+    const sessao=JSON.parse(localStorage.getItem('tj_sessao')||'null');
+    const intencao=localStorage.getItem('tj_login_intencao') || (sessao&&sessao.tipo) || '';
+    const perfil=await carregarPerfil(user);
+    if(!perfil || perfil.active!==true){
+      try{ localStorage.removeItem('tj_sessao'); localStorage.removeItem('tj_login_intencao'); }catch(e){}
+      await auth.signOut();
+      aviso('Este acesso foi desativado pela TJ Refrigeração.');
+      return;
+    }
+
+    // Se o login foi iniciado pela área administrativa, nunca deixar o app
+    // cair silenciosamente no painel do cliente.
+    if(intencao==='empresa'){
+      if(perfil.role!=='owner'){
+        await auth.signOut();
+        aviso('Esta conta não está cadastrada como proprietário no Firestore.');
+        return;
+      }
+      window.TJFB.perfilEmpresa=perfil;
+      guardaSessao(user,'empresa');
+      await carregarDadosEmpresaFirebase();
+      telaApp('empresa');
+      return;
+    }
+
+    // Se a conta é owner, o painel administrativo sempre tem prioridade.
+    if(perfil.role==='owner'){
+      window.TJFB.perfilEmpresa=perfil;
+      guardaSessao(user,'empresa');
+      await carregarDadosEmpresaFirebase();
+      telaApp('empresa');
+      return;
+    }
+
+    clienteAtualNome=perfil.nome||perfil.empresa||user.email||'Cliente';
+    window.TJFB.perfilCliente=perfil;
+    atualizarIdentidadeCliente(perfil);
+    guardaSessao(user,'cliente');
+    await carregarDadosCliente(user,perfil);
+    telaApp('cliente');
+  }catch(e){ console.error('[TJFB] sessão',e); aviso('Não foi possível carregar sua sessão.'); }
+});
+})();
+</script>
+<!-- ===== FIM TJ FIREBASE ===== -->
+
+
+
+<!-- ===== PWA TJ REFRIGERAÇÃO ===== -->
+<script>
+(function(){
+  'use strict';
+  var deferredInstallPrompt = null;
+
+  function standalone(){
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+  function isIOS(){
+    return /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+  }
+  function mensagemInstalacao(){
+    if(standalone()) return 'O aplicativo TJ Refrigeração já está instalado neste aparelho.';
+    if(isIOS()) return 'Para instalar no iPhone/iPad:\n\n1. Abra este site no Safari.\n2. Toque no botão Compartilhar (quadrado com seta para cima).\n3. Role as opções e toque em “Adicionar à Tela de Início”.\n4. Confirme em “Adicionar”.\n\nO ícone da TJ Refrigeração aparecerá na sua tela inicial.';
+    return 'Para instalar no Android:\n\n1. Abra este site no Google Chrome.\n2. Toque no menu ⋮ do Chrome.\n3. Escolha “Instalar app” ou “Adicionar à tela inicial”.\n4. Confirme a instalação.\n\nSe o Chrome oferecer a instalação automaticamente, basta confirmar.';
+  }
+
+  function atualizarBotoes(){
+    var botoes=document.querySelectorAll('.pwa-install-trigger');
+    for(var i=0;i<botoes.length;i++){
+      botoes[i].style.display = standalone() ? 'none' : '';
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', function(ev){
+    ev.preventDefault();
+    deferredInstallPrompt = ev;
+    atualizarBotoes();
+  });
+
+  window.addEventListener('appinstalled', function(){
+    deferredInstallPrompt = null;
+    atualizarBotoes();
+    if(typeof toast === 'function') toast('TJ Refrigeração instalado com sucesso!');
+  });
+
+  document.addEventListener('click', async function(ev){
+    var btn = ev.target && ev.target.closest ? ev.target.closest('.pwa-install-trigger') : null;
+    if(!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    if(standalone()){
+      alert(mensagemInstalacao());
+      return;
+    }
+    if(deferredInstallPrompt){
+      try{
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        atualizarBotoes();
+      }catch(e){
+        console.warn('[TJPWA] instalação',e);
+      }
+      return;
+    }
+    alert(mensagemInstalacao());
+  }, true);
+
+  // Registro e atualização gerenciados por assets/tj-pwa-update.js.
+  atualizarBotoes();
+})();
+</script>
+<!-- ===== FIM PWA TJ REFRIGERAÇÃO ===== -->
+
+
+<!-- ===== TJ V13: ADMINISTRADOR TOTAL / CRUD OPERACIONAL ===== -->
+<script>
+(function(){
+'use strict';
+function $v(id){return document.getElementById(id);}
+function ownerOk(){return state && state.perfilSessao==='empresa' && window.TJFB && window.TJFB.db && window.TJFB.auth && window.TJFB.auth.currentUser;}
+function avisoV13(msg){if(typeof toast==='function') toast(msg); else alert(msg);}
+function clientesV13(){return (state.clientesFirebase||[]).slice();}
+function clientePorUid(uid){return clientesV13().find(function(c){return c.uid===uid;})||null;}
+function clientePorNome(nome){return clientesV13().find(function(c){return c.nome===nome;})||null;}
+function uidRegistro(obj){return (obj&&obj.clienteUid)||((obj&&obj.cliente)?((clientePorNome(obj.cliente)||{}).uid||''):'');}
 function limparCampos(ids){ids.forEach(function(id){var e=$v(id);if(e)e.value='';});}
 function gerarNumero(prefix, arr, prop){return window.TJCore.nextNumber(prefix,arr,prop);}
 function hoje(){return new Date().toLocaleDateString('pt-BR');}
