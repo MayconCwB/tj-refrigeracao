@@ -1,10 +1,11 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v34-equipamentos-chamado';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v35-atendimento';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
   './assets/tj-pwa-update.js',
   './assets/tj-orcamento-fluxo.js',
   './assets/tj-cadastros.js',
+  './assets/tj-atendimento.js',
   './manifest.webmanifest',
   './assets/tj-logo.png',
   './assets/tj-watermark.png',
