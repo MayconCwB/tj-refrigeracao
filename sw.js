@@ -1,7 +1,8 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v32-pecas-ncm';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v33-atualizacao';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
+  './assets/tj-pwa-update.js',
   './assets/tj-orcamento-fluxo.js',
   './assets/tj-cadastros.js',
   './manifest.webmanifest',
@@ -16,7 +17,7 @@ const APP_SHELL = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL.map(path => new Request(path, {cache: 'reload'})))));
   self.skipWaiting();
 });
 
@@ -30,35 +31,18 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  const request = event.request;
-  if (request.method !== 'GET') return;
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          if (!response.ok) return response;
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
-          return response;
-        })
-        .catch(() => caches.match('./index.html'))
-    );
-    return;
+  const request=event.request, url=new URL(request.url);
+  if(request.method!=='GET'||url.origin!==self.location.origin)return;
+  const navigation=request.mode==='navigate';
+  const code=/\.(?:js|css)$/.test(url.pathname);
+  async function cached(){const cache=await caches.open(CACHE_NAME);return cache.match(navigation?'./index.html':request);}
+  async function fresh(){
+    const response=await fetch(request,{cache:'no-cache'});
+    if(response.ok){const cache=await caches.open(CACHE_NAME);await cache.put(navigation?'./index.html':request,response.clone());}
+    return response;
   }
-
-  event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached;
-      return fetch(request).then(response => {
-        if (response && response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-        }
-        return response;
-      });
-    })
-  );
+  event.respondWith((async()=>{
+    if(navigation||code){try{return await fresh();}catch(e){return await cached()||new Response('Sem conexão. Abra novamente quando estiver online.',{status:503});}}
+    return await cached()||fresh();
+  })());
 });

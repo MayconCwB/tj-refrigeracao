@@ -16,6 +16,7 @@
   <meta name="apple-mobile-web-app-title" content="TJ Refrigeração">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script src="./assets/tj-core.js"></script>
+<script src="./assets/tj-pwa-update.js"></script>
   <script>
   /* TJ v24 — tema Claro / Escuro / Sistema com preferência local */
   (function(){
@@ -3374,7 +3375,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
         var n = state.notificacoesCliente[i];
         var item = document.createElement("div");
         item.style.padding = "12px";
-        item.style.border = "1px solid #E2E8F0";
+        item.style.border = "1px solid var(--border)";
         item.style.borderRadius = "8px";
         item.style.display = "flex";
         item.style.gap = "12px";
@@ -3492,7 +3493,8 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
           item.style.padding = "14px";
           item.style.border = "1px solid #E2E8F0";
           item.style.borderRadius = "8px";
-          item.style.background = "#FFFFFF";
+          item.style.background = "var(--surface)";
+          item.style.color = "var(--text)";
 
           var top = document.createElement("div");
           top.style.display = "flex";
@@ -3510,16 +3512,16 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 
           var det = document.createElement("div");
           det.style.fontSize = "0.82rem";
-          det.style.color = "#64748B";
+          det.style.color = "var(--text-muted)";
           det.style.marginTop = "6px";
           det.textContent = eq.marca + " " + eq.modelo + " • S/N: " + eq.sn + " • Local: " + eq.local;
 
           var chamadosInfo = document.createElement("div");
           chamadosInfo.style.fontSize = "0.78rem";
-          chamadosInfo.style.color = "#0B2A4A";
+          chamadosInfo.style.color = "var(--text)";
           chamadosInfo.style.fontWeight = "600";
           chamadosInfo.style.marginTop = "4px";
-          chamadosInfo.textContent = eq.ncham + " atendimentos registrados";
+          chamadosInfo.textContent = (Number.isFinite(Number(eq.ncham)) && Number(eq.ncham) >= 0 ? Math.floor(Number(eq.ncham)) : 0) + " atendimentos registrados";
 
           item.appendChild(top);
           item.appendChild(det);
@@ -5213,7 +5215,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 
         var meta = document.createElement("div");
         meta.className = "list-meta";
-        meta.textContent = "Cliente: " + eq.cliente + " • Local: " + eq.local + " • " + eq.ncham + " chamados";
+        meta.textContent = "Cliente: " + eq.cliente + " • Local: " + eq.local + " • " + (Number.isFinite(Number(eq.ncham)) && Number(eq.ncham) >= 0 ? Math.floor(Number(eq.ncham)) : 0) + " chamados";
 
         item.appendChild(top);
         item.appendChild(meta);
@@ -5254,7 +5256,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
       if (elSn) elSn.textContent = eq.sn;
 
       var elN = document.getElementById("det-eq-ncham");
-      if (elN) elN.textContent = eq.ncham + " atendimentos registrados";
+      if (elN) elN.textContent = (Number.isFinite(Number(eq.ncham)) && Number(eq.ncham) >= 0 ? Math.floor(Number(eq.ncham)) : 0) + " atendimentos registrados";
     }
 
     // ORÇAMENTOS EMPRESA
@@ -7974,13 +7976,7 @@ auth.onAuthStateChanged(async function(user){
     alert(mensagemInstalacao());
   }, true);
 
-  if('serviceWorker' in navigator){
-    window.addEventListener('load', function(){
-      navigator.serviceWorker.register('./sw.js', {scope:'./'})
-        .then(function(reg){ console.log('[TJPWA] Service Worker ativo:', reg.scope); })
-        .catch(function(err){ console.error('[TJPWA] Falha no Service Worker:', err); });
-    });
-  }
+  // Registro e atualização gerenciados por assets/tj-pwa-update.js.
   atualizarBotoes();
 })();
 </script>
@@ -8590,7 +8586,7 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
     normalizarControles();
     var drawer=document.querySelector('.drawer-panel,.side-drawer,.sidebar');
     var antigo=drawer&&drawer.querySelector('.tj-v25-version');if(antigo)antigo.remove();
-    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v31';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
+    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v33';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
   });
   var obs=new MutationObserver(normalizarControles);document.addEventListener('DOMContentLoaded',function(){if(document.body)obs.observe(document.body,{childList:true,subtree:true});});
 })();
