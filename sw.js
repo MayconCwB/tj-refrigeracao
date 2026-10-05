@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v33-atualizacao';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v34-equipamentos-chamado';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',

@@ -8030,12 +8030,28 @@ function preencherSelectClientes(id, selecionado){
   cs.forEach(function(c){var op=document.createElement('option');op.value=c.uid;op.textContent=c.nome+' — '+c.tipo;sel.appendChild(op);});
   if(selecionado) sel.value=selecionado;
 }
-function preencherEquipChamado(uid, selecionado){
-  var sel=$v('admin-chamado-equip');if(!sel)return;sel.innerHTML='';
-  var lista=(state.equip||[]).filter(function(e){return uidRegistro(e)===uid;});
-  if(!lista.length){var op=document.createElement('option');op.value='Equipamento não cadastrado';op.textContent='Equipamento não cadastrado';sel.appendChild(op);return;}
-  lista.forEach(function(e){var op=document.createElement('option');op.value=e.nome;op.textContent=e.nome+(e.marca?' — '+e.marca:'');sel.appendChild(op);});
-  if(selecionado) sel.value=selecionado;
+var equipamentoChamadoCarga=0;
+async function preencherEquipChamado(uid, selecionado){
+  var sel=$v('admin-chamado-equip');if(!sel)return;
+  var carga=++equipamentoChamadoCarga, actorUid=window.TJFB.auth.currentUser&&window.TJFB.auth.currentUser.uid;
+  function option(value,label){var op=document.createElement('option');op.value=value;op.textContent=label;sel.appendChild(op);return op;}
+  var refresh=$v('admin-chamado-atualizar-equip');
+  if(!refresh){refresh=document.createElement('button');refresh.id='admin-chamado-atualizar-equip';refresh.type='button';refresh.className='btn-tj-secondary';refresh.textContent='Atualizar equipamentos';refresh.addEventListener('click',function(){preencherEquipChamado($v('admin-chamado-cliente').value,sel.value);});sel.parentNode.appendChild(refresh);}
+  sel.innerHTML='';sel.disabled=true;refresh.disabled=true;
+  if(!uid){option('','Selecione um cliente primeiro');refresh.disabled=false;return;}
+  option('','Carregando equipamentos…');
+  try{
+    var doc=await window.TJFB.db.collection('clientData').doc(uid).get();
+    if(carga!==equipamentoChamadoCarga||!ownerOk()||window.TJFB.auth.currentUser.uid!==actorUid||$v('admin-chamado-cliente').value!==uid)return;
+    var cli=clientePorUid(uid),lista=doc.exists&&Array.isArray(doc.data().equip)?doc.data().equip:[];
+    state.equip=(state.equip||[]).filter(function(e){return uidRegistro(e)!==uid;}).concat(lista.map(function(e){return Object.assign({},e,{clienteUid:uid,cliente:cli?cli.nome:e.cliente});}));
+    sel.innerHTML='';
+    if(!lista.length)option('','Nenhum equipamento cadastrado para este cliente');
+    else {option('','Selecione o equipamento');lista.forEach(function(e){if(!e.nome)return;var op=option(e.nome,e.nome+(e.marca?' — '+e.marca:'')+(e.sn?' • S/N: '+e.sn:''));op.dataset.equipId=e.id||'';});}
+    if(selecionado){if(lista.some(function(e){return e.nome===selecionado;}))sel.value=selecionado;else if(('admin-chamado-id').value&&('admin-chamado-uid-original').value===uid){option(selecionado,selecionado+' (equipamento anterior do chamado)');sel.value=selecionado;}}
+    sel.disabled=false;
+  }catch(e){if(carga!==equipamentoChamadoCarga)return;sel.innerHTML='';option('','Falha ao carregar. Clique em Atualizar equipamentos.');sel.disabled=true;}
+  finally{if(carga===equipamentoChamadoCarga)refresh.disabled=false;}
 }
 
 function abrirFormChamado(obj, uidPreferido){
@@ -8058,6 +8074,7 @@ function abrirFormChamado(obj, uidPreferido){
 async function salvarChamado(){
   if(!ownerOk())return avisoV13('Acesso restrito ao proprietário.');
   var id=$v('admin-chamado-id').value, uid=$v('admin-chamado-cliente').value, oldUid=$v('admin-chamado-uid-original').value;
+  if($v('admin-chamado-equip').disabled)return avisoV13('Aguarde o carregamento dos equipamentos ou clique em Atualizar equipamentos.');
   var cli=clientePorUid(uid), equip=$v('admin-chamado-equip').value, problema=$v('admin-chamado-problema').value.trim();
   if(!uid||!cli||!equip||!problema)return avisoV13('Selecione o cliente, o equipamento e descreva o problema.');
   var agendamento=valorAgendamento();
@@ -8586,7 +8603,7 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
     normalizarControles();
     var drawer=document.querySelector('.drawer-panel,.side-drawer,.sidebar');
     var antigo=drawer&&drawer.querySelector('.tj-v25-version');if(antigo)antigo.remove();
-    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v33';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
+    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v34';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
   });
   var obs=new MutationObserver(normalizarControles);document.addEventListener('DOMContentLoaded',function(){if(document.body)obs.observe(document.body,{childList:true,subtree:true});});
 })();
