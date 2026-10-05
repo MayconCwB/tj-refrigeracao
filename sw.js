@@ -1,9 +1,10 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v42-financeiro-compat';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v43-decisao-proprietario';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
   './assets/tj-pwa-update.js',
   './assets/tj-orcamento-fluxo.js',
+  './assets/tj-orcamento-decisao.js',
   './assets/tj-cadastros.js',
   './assets/tj-atendimento.js',
   './assets/tj-atendimento-pecas.js',
