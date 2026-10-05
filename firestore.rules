@@ -203,7 +203,8 @@ service cloud.firestore {
     }
     function validPart(d) {
       return d.keys().hasAll(['nome','codigo','marca','descricao','unidade','custoCentavos','precoCentavos','estoque','ativo','criadoEm','atualizadoEm'])
-        && d.keys().hasOnly(['nome','codigo','marca','descricao','unidade','custoCentavos','precoCentavos','estoque','ativo','criadoEm','atualizadoEm'])
+        && d.keys().hasOnly(['nome','codigo','ncm','marca','descricao','unidade','custoCentavos','precoCentavos','estoque','ativo','criadoEm','atualizadoEm'])
+        && (!('ncm' in d) || (d.ncm is string && d.ncm.matches('^[0-9]{8}$')))
         && text(d.nome,200) && d.nome.size()>0 && text(d.codigo,80) && d.codigo.size()>0
         && text(d.marca,100) && text(d.descricao,2000) && d.unidade in ['un','kg','m','l','kit']
         && d.custoCentavos is int && d.custoCentavos>=0 && d.custoCentavos<=99999999
@@ -213,7 +214,7 @@ service cloud.firestore {
     }
     match /pecas/{id} {
       allow read: if owner();
-      allow create: if owner() && validPart(request.resource.data) && request.resource.data.criadoEm==request.time;
+      allow create: if owner() && validPart(request.resource.data) && ('ncm' in request.resource.data) && request.resource.data.criadoEm==request.time;
       allow update: if owner() && validPart(request.resource.data) && request.resource.data.criadoEm==resource.data.criadoEm;
       allow delete: if owner();
     }

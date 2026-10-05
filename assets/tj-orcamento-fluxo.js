@@ -10,7 +10,7 @@
   }
   function button(budget) {
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'btn-tj'; b.textContent = 'Gerar agendamento / pedido';
+    b.type = 'button'; b.className = 'btn-tj'; b.textContent = 'Gerar agendamento';
     b.addEventListener('click', () => open(budget));
     return b;
   }
@@ -44,24 +44,21 @@
     const accountUid = window.TJFB.auth.currentUser.uid;
     const dialog = document.createElement('dialog'); dialog.className = 'tj-flow';
     dialog.setAttribute('aria-labelledby', 'tj-flow-title');
-    dialog.innerHTML = '<form><h2 id="tj-flow-title">Gerar a partir do orçamento</h2><p class="tj-flow-summary"></p><label>Chamado vinculado<select name="chamado"><option value="">Sem chamado vinculado</option></select></label><label class="tj-flow-check"><input name="schedule" type="checkbox" checked>Gerar agendamento</label><div class="tj-flow-schedule"><div class="tj-flow-row"><label>Data<input name="date" type="date"></label><label>Horário<input name="time" type="time"></label></div><label>Local<input name="local" type="text" maxlength="500"></label><label>Observações<textarea name="notes" maxlength="2000" rows="2"></textarea></label></div><label class="tj-flow-check"><input name="order" type="checkbox">Gerar pedido de peças</label><div class="tj-flow-order" hidden><label>Peças e quantidades<textarea name="parts" rows="4" maxlength="4000"></textarea></label><small>Revise a lista e remova serviços ou mão de obra antes de gerar o pedido.</small></div><p>Cliente, itens e valor aprovado ficam vinculados aos registros gerados. O orçamento mantém sua aprovação.</p><p class="tj-flow-error" role="alert"></p><footer><button type="button" class="btn-tj-secondary tj-flow-cancel">Cancelar</button><button type="submit" class="btn-tj">Salvar registros</button></footer></form>';
+    dialog.innerHTML = '<form><h2 id="tj-flow-title">Gerar a partir do orçamento</h2><p class="tj-flow-summary"></p><label>Chamado vinculado<select name="chamado"><option value="">Sem chamado vinculado</option></select></label><label class="tj-flow-check"><input name="schedule" type="checkbox" checked>Gerar agendamento</label><div class="tj-flow-schedule"><div class="tj-flow-row"><label>Data<input name="date" type="date"></label><label>Horário<input name="time" type="time"></label></div><label>Local<input name="local" type="text" maxlength="500"></label><label>Observações<textarea name="notes" maxlength="2000" rows="2"></textarea></label></div><p>Cliente, itens e valor aprovado ficam vinculados aos registros gerados. O orçamento mantém sua aprovação.</p><p class="tj-flow-error" role="alert"></p><footer><button type="button" class="btn-tj-secondary tj-flow-cancel">Cancelar</button><button type="submit" class="btn-tj">Salvar registros</button></footer></form>';
     const form = dialog.querySelector('form'); const field = name => form.elements.namedItem(name);
     dialog.querySelector('.tj-flow-summary').textContent = '#' + budget.num + ' • ' + budget.cliente + ' • ' + budget.servico + ' • ' + formatarMoedaBR(budget.total);
     (state.chamados || []).filter(c => c.clienteUid === uid || (!c.clienteUid && c.cliente === budget.cliente)).forEach(c => {
       const option = document.createElement('option'); option.value = c.num; option.textContent = '#' + c.num + ' — ' + (c.equip || c.problema || 'Chamado'); field('chamado').appendChild(option);
     });
     field('chamado').value = budget.chamado || '';
-    field('parts').value = core.items(budget.itens).map(i => (i.qtd || i.quantidade || '1') + ' × ' + (i.descricao || i.item || i.nome || '')).join('\n');
     const client = (state.clientesFirebase || []).find(c => c.uid === uid);
     const address = client && Array.isArray(client.enderecos) && client.enderecos.find(e => e.tipo === 'Atendimento');
     field('local').value = address ? (address.endereco || address.logradouro || '') : '';
     function toggle() {
       dialog.querySelector('.tj-flow-schedule').hidden = !field('schedule').checked;
-      dialog.querySelector('.tj-flow-order').hidden = !field('order').checked;
       field('date').required = field('time').required = field('schedule').checked;
-      field('parts').required = field('order').checked;
     }
-    field('schedule').addEventListener('change', toggle); field('order').addEventListener('change', toggle); toggle();
+    field('schedule').addEventListener('change', toggle); toggle();
     let busy = false;
     dialog.querySelector('.tj-flow-cancel').addEventListener('click', () => dialog.close());
     dialog.addEventListener('cancel', e => { if (busy) e.preventDefault(); });
@@ -69,7 +66,7 @@
     form.addEventListener('submit', async e => {
       e.preventDefault(); if (busy) return;
       const error = dialog.querySelector('.tj-flow-error'); error.textContent = '';
-      const input = { schedule: field('schedule').checked, order: field('order').checked, date: field('date').value, time: field('time').value, chamado: field('chamado').value, parts: field('parts').value, local: field('local').value, notes: field('notes').value };
+      const input = { schedule: field('schedule').checked, order: false, date: field('date').value, time: field('time').value, chamado: field('chamado').value, parts: '', local: field('local').value, notes: field('notes').value };
       const db = window.TJFB.db;
       const ids = { schedule: 'AG-' + db.collection('clientData').doc().id, order: 'PED-' + db.collection('clientData').doc().id };
       busy = true; Array.from(form.elements).forEach(el => { el.disabled = true; });

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v31-cadastros';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v32-pecas-ncm';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
