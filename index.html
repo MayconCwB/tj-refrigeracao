@@ -3413,6 +3413,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
     }
 
     // AGENDAMENTOS CLIENTE
+    function registroDoClienteAtual(x){var uid=window.TJFB&&window.TJFB.auth.currentUser&&window.TJFB.auth.currentUser.uid;return x.clienteUid?x.clienteUid===uid:x.cliente===clienteAtualNome;}
     function renderizarAgendaCompleta() {
       var box = document.getElementById("lista-agenda-completa");
       if (!box) return;
@@ -3539,7 +3540,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 
       for (var i = 0; i < state.chamados.length; i++) {
         var c = state.chamados[i];
-        if (c.cliente === clienteAtualNome) {
+        if (registroDoClienteAtual(c)) {
           var card = document.createElement("div");
           card.className = "list-item";
 
@@ -3612,7 +3613,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
     function renderizarDetalheChamadoCliente() {
       var ch = null;
       for (var i = 0; i < state.chamados.length; i++) {
-        if (state.chamados[i].num === chamadoAtualNum) {
+        if (String(state.chamados[i].num) === String(chamadoAtualNum)) {
           ch = state.chamados[i];
           break;
         }
@@ -3718,7 +3719,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 
       for (var i = 0; i < state.historicoCliente.length; i++) {
         var h = state.historicoCliente[i];
-        if (histFiltroCli !== "tudo" && h.tipo !== histFiltroCli) {
+        if (histFiltroCli !== "tudo" && (histFiltroCli === "chamado" ? ["chamado","atend"].indexOf(h.tipo) < 0 : h.tipo !== histFiltroCli)) {
           continue;
         }
 
@@ -3767,7 +3768,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 
       for (var i = 0; i < state.orcamentos.length; i++) {
         var o = state.orcamentos[i];
-        if (o.cliente === clienteAtualNome) {
+        if (registroDoClienteAtual(o)) {
           var item = document.createElement("div");
           item.className = "list-item";
           item.setAttribute("data-action", "abrir-orc");
@@ -7309,6 +7310,7 @@ async function carregarDadosCliente(user,perfil){
   clienteBase=null;clienteDadosUid='';limparDadosCliente();
   try{
     const snap=await db.collection('clientData').doc(user.uid).get();
+    if(auth.currentUser?.uid!==user.uid)return false;
     if(!snap.exists){
       // Conta nova: nunca mostrar os dados fictícios do protótipo.
       state.chamados=[];
@@ -7571,7 +7573,7 @@ function salvarDadosCliente(){
 }
 window.TJFB.salvarDadosCliente=salvarDadosCliente;
 window.TJFB.salvarClienteAgora=salvarClienteAgora;
-window.TJFB.atualizarDadosCliente=async function(){await salvarClienteAgora();await carregarDadosCliente(auth.currentUser,window.TJFB.perfilCliente);};
+window.TJFB.atualizarDadosCliente=async function(){var user=auth.currentUser;if(!user)throw Error('Sessão expirada.');await salvarClienteAgora();if(auth.currentUser?.uid!==user.uid)throw Error('Sessão alterada.');await carregarDadosCliente(user,window.TJFB.perfilCliente);};
 let decidindoOrcamento=false;
 window.TJFB.decidirOrcamento=async function(num,tipo,msg){
   if(decidindoOrcamento)return;
@@ -8603,7 +8605,7 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
     normalizarControles();
     var drawer=document.querySelector('.drawer-panel,.side-drawer,.sidebar');
     var antigo=drawer&&drawer.querySelector('.tj-v25-version');if(antigo)antigo.remove();
-    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v35';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
+    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v36';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
   });
   var obs=new MutationObserver(normalizarControles);document.addEventListener('DOMContentLoaded',function(){if(document.body)obs.observe(document.body,{childList:true,subtree:true});});
 })();
@@ -8611,4 +8613,5 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
 <script src="./assets/tj-orcamento-fluxo.js"></script>
 <script src="./assets/tj-cadastros.js"></script>
 <script src="./assets/tj-atendimento.js"></script>
+<script src="./assets/tj-cliente-acompanhamento.js"></script>
 </html>

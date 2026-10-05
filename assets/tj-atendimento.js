@@ -21,6 +21,7 @@
       if(current.status===status&&(at.diag||'')===diagnosis)return;
       const date=new Date().toLocaleDateString('pt-BR'),nextCalls=calls.map((c,i)=>i===idx?{...c,status}:c);
       const patch={chamados:nextCalls,chamadoIds:nextCalls.map(c=>String(c.num)),atendimentos:{...(data.atendimentos||{}),[current.num]:{...at,diag:diagnosis}},historicoCliente:[{data:date,tipo:'atend',titulo:'Atendimento #'+current.num+' atualizado',desc:status==='Concluído'?'Atendimento concluído pela TJ.':'Status: '+status,status},...(data.historicoCliente||[])],notificacoesCliente:[{data:date,titulo:status==='Concluído'?'Atendimento concluído':'Atendimento atualizado',desc:'Chamado #'+current.num+' — '+status,lida:false},...(data.notificacoesCliente||[])],atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()};
+      if(status==='Concluído'||status==='Cancelado')patch.agendamentos=(data.agendamentos||[]).map(a=>String(a.chamado||'')===String(current.num)?{...a,status}:a);
       tx.set(ref,window.TJFirestoreSafe(patch),{merge:true});
     });
   }
