@@ -1,6 +1,6 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.TJFinanceCore=api;})(typeof window==='undefined'?globalThis:window,function(){
   'use strict';
-  function amount(raw){const s=String(raw??'').trim().replace(/^R\$\s*/,'');if(!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(s))return null;const [w,f='']=s.replace(/\./g,'').split(',');const n=Number(w)*100+Number(f.padEnd(2,'0'));return Number.isSafeInteger(n)&&n>=0&&n<=99999999?n:null;}
+  function amount(raw){const s=String(raw??'').trim().replace(/^R\$\s*/,'').replace(/^(\d+)\.(\d{1,2})$/,'$1,$2');if(!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(s))return null;const [w,f='']=s.replace(/\./g,'').split(',');const n=Number(w)*100+Number(f.padEnd(2,'0'));return Number.isSafeInteger(n)&&n>=0&&n<=99999999?n:null;}
   const key=(uid,num)=>JSON.stringify([uid,String(num)]);
   function calculate(customers,receipts,links){
     const rows=[],byQuote=new Map(),byLink=new Map(),unlinked=[],issues=[];let received=0;
@@ -65,5 +65,6 @@
   const nav=document.getElementById('drawer-nav-empresa');if(nav){const b=document.createElement('button');b.type='button';b.className='drawer-card';b.dataset.action='nav-tela';b.dataset.id=section.id;b.innerHTML='<span class="drawer-card-icon">💰</span><span class="drawer-card-content"><span class="drawer-card-title">Financeiro</span><span class="drawer-card-desc">Recebimentos e saldos por atendimento</span></span><span class="drawer-card-arrow">→</span>';nav.append(b);}
   const navigate=abrirTela;abrirTela=function(id){if(id===section.id&&!owner())return;const result=navigate.apply(this,arguments);if(id===section.id){atualizarBreadcrumb?.([{label:'Financeiro'}]);load();}return result;};
   fb().auth.onAuthStateChanged(()=>{generation++;loading=false;clear();status.textContent='';section.classList.add('hidden');$('tj-finance-search').value='';$('tj-finance-filter').value='';document.querySelectorAll('dialog.tj-finance-dialog').forEach(d=>d.close());});
+  window.addEventListener('tj-budgets-changed',()=>{if(owner()&&!section.classList.contains('hidden'))load();});
   window.addEventListener('tj-receipts-changed',()=>{if(owner()&&!section.classList.contains('hidden'))load();});
 })();

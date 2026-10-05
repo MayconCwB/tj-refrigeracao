@@ -2006,7 +2006,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
               <label class="form-label" for="admin-chamado-endereco">Endereço / local</label>
               <input type="text" id="admin-chamado-endereco" class="form-input" placeholder="Local do atendimento">
             </div>
-            <div class="form-group"><label class="form-label" for="admin-chamado-km">Deslocamento em km (ida e volta)</label><input id="admin-chamado-km" class="form-input" inputmode="decimal" placeholder="Opcional: 25,5"></div><div class="form-group"><label class="form-label" for="admin-chamado-obs">Observações</label><textarea id="admin-chamado-obs" class="form-textarea" rows="2"></textarea></div>
+            <div class="form-group"><label class="form-label" for="admin-chamado-orcamento">Orçamento aprovado do cliente (opcional)</label><select id="admin-chamado-orcamento" class="form-select"></select></div><div class="form-group"><label class="form-label" for="admin-chamado-km">Deslocamento em km (ida e volta)</label><input id="admin-chamado-km" class="form-input" inputmode="decimal" placeholder="Opcional: 25,5"></div><div class="form-group"><label class="form-label" for="admin-chamado-obs">Observações</label><textarea id="admin-chamado-obs" class="form-textarea" rows="2"></textarea></div>
             <button type="button" class="btn-tj" style="width:100%;" data-action="admin-salvar-chamado">SALVAR CHAMADO</button>
             <button type="button" class="btn-tj-secondary" style="width:100%; margin-top:8px;" data-action="admin-cancelar-chamado">CANCELAR</button>
           </div>
@@ -3090,8 +3090,12 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
     // NAVEGAÇÃO ENTRE TELAS (ESTILO PASTAS) COM PILHA DE VOLTAR
     function abrirTela(id, empilhar) {
       fecharDrawer();
-      if (empilhar !== false && telaAtual && telaAtual !== id) {
-        historicoNavegacao.push(telaAtual);
+      if (!document.getElementById(id)) return;
+      if (id === 'tela-emp-dash' || id === 'tela-cli-dash') historicoNavegacao=[];
+      else if (empilhar !== false && telaAtual && telaAtual !== id) {
+        var visited=historicoNavegacao.lastIndexOf(id);
+        if(visited>=0)historicoNavegacao=historicoNavegacao.slice(0,visited);
+        else historicoNavegacao.push(telaAtual);
       }
       telaAtual = id;
       var secoes = document.querySelectorAll("main.content-area > section");
@@ -7041,7 +7045,7 @@ function injetaEditorItens(){
       var ins=l.querySelectorAll('input');
       ins[0].value=item.descricao||item.desc||'';
       ins[1].value=item.qtd||item.quantidade||'1';
-      ins[2].value=item.valor||item.preco||'';
+      ins[2].value=String(item.valor||item.preco||'').replace(/^R\$\s*/,'').replace(/\.(?=\d{3}(?:\D|$))/g,'').replace(',','.');
       l.querySelector('button').addEventListener('click',function(){l.remove();if(!corpo.children.length)linha({});total();});
       ins.forEach(function(i){i.addEventListener('input',total);});
       corpo.appendChild(l);
@@ -7056,7 +7060,7 @@ function injetaEditorItens(){
         soma+=q*v;
       });
       editor.querySelector('.tj-total-itens').textContent='Total dos itens: '+formatarMoedaBR(soma);
-      if(campoTotal)campoTotal.value=soma?soma.toFixed(2):'';
+      if(campoTotal)campoTotal.value=soma?soma.toFixed(2).replace('.',','):'';
     }
     function definirItens(itens){
       corpo.innerHTML='';
@@ -7072,6 +7076,7 @@ function injetaEditorItens(){
 }
 
 window.TJOrcamentoItens={
+  ler:function(){return Array.from(document.querySelectorAll('#tela-form-novo-orcamento .tj-corpo-itens .tj-linha-item')).map(function(l){return {descricao:l.querySelector('.tj-item-desc').value.trim(),qtd:l.querySelector('.tj-item-qtd').value,valor:l.querySelector('.tj-item-valor').value.replace('.',',')};}).filter(function(i){return i.descricao||i.valor;});},
   definir:function(itens){
     var editor=document.querySelector('#tela-form-novo-orcamento .tj-editor-itens');
     if(editor&&typeof editor._tjDefinirItens==='function')editor._tjDefinirItens(itens||[]);
@@ -7345,16 +7350,18 @@ async function carregarDadosCliente(user,perfil){
 }
 
 
-async function carregarDadosEmpresaFirebase(){
+async function carregarDadosEmpresaFirebase(liveSnapshots){
+  const loadingAccount=auth.currentUser?.uid;
   if(!window.TJFB || !window.TJFB.db || !window.TJFB.auth || !window.TJFB.auth.currentUser) return [];
   try{
     // V14: cruza clients + users + clientData para nunca exibir UID como nome do cliente.
-    const [snapClients,snapUsers,snapData]=await Promise.all([
+    const [snapClients,snapUsers,snapData]=liveSnapshots||await Promise.all([
       db.collection('clients').get(),
       db.collection('users').get(),
       db.collection('clientData').get()
     ]);
 
+    if(auth.currentUser?.uid!==loadingAccount||state.perfilSessao!=='empresa')return false;
     const cadastros={}, perfis={}, nomes={};
     snapClients.forEach(function(doc){
       const c=doc.data()||{};
@@ -8056,10 +8063,16 @@ async function preencherEquipChamado(uid, selecionado){
   finally{if(carga===equipamentoChamadoCarga)refresh.disabled=false;}
 }
 
+function preencherOrcChamado(uid,selected){
+  var sel=$v('admin-chamado-orcamento');sel.replaceChildren(new Option('Sem orçamento vinculado',''));
+  (state.orcamentos||[]).filter(function(q){return q.clienteUid===uid&&q.status==='Aprovado';}).forEach(function(q){sel.appendChild(new Option('#'+q.num+' — '+q.servico+' — '+formatarMoedaBR(q.total),String(q.num)));});
+  if(selected)sel.value=String(selected);
+}
 function abrirFormChamado(obj, uidPreferido){
   var uid=uidPreferido||uidRegistro(obj)||((clientesV13()[0]||{}).uid||'');
   preencherSelectClientes('admin-chamado-cliente',uid);
   preencherEquipChamado(uid,obj&&obj.equip);
+  preencherOrcChamado(uid,obj&&obj.orcamentoNum);
   $v('admin-chamado-id').value=obj?obj.num:'';$v('admin-chamado-uid-original').value=obj?uid:'';
   $v('admin-chamado-titulo').textContent=obj?'Editar Chamado #'+obj.num:'Cadastrar Chamado';
   $v('admin-chamado-problema').value=(obj&&(obj.problema||obj.desc))||'';
@@ -8086,17 +8099,29 @@ async function salvarChamado(){
   if(agendamento===null)return avisoV13('Preencha a data e o horário do agendamento juntos.');
   var kmInput=$v('admin-chamado-km').value.trim(),kmValue=null;try{if(kmInput)kmValue=window.TJTravel.parseKm(kmInput);}catch(e){return avisoV13(e.message);}
   var novo=!id;if(novo)id=gerarNumero('',state.chamados,'num');
+  if(!novo&&oldUid&&oldUid!==uid)return avisoV13('Mantenha o cliente original do chamado. Cadastre um novo para outro cliente.');
   if(!novo&&oldUid&&oldUid!==uid){
     var od=await lerDados(oldUid), oa=Array.isArray(od.chamados)?od.chamados:[];oa=oa.filter(function(x){return String(x.num)!==String(id);});
     var om=Object.assign({},od.mensagens||{}), ot=Object.assign({},od.atendimentos||{});delete om[id];delete ot[id];await gravarDados(oldUid,{chamados:oa,mensagens:om,atendimentos:ot});
   }
-  var d=await lerDados(uid), arr=Array.isArray(d.chamados)?d.chamados:[], existente=arr.find(function(x){return String(x.num)===String(id);});
+  var budgetNumber=$v('admin-chamado-orcamento').value,actorUid=window.TJFB.auth.currentUser.uid;
+  await window.TJFB.db.runTransaction(async function(tx){
+  var actor=await tx.get(window.TJFB.db.collection('users').doc(actorUid)),customer=await tx.get(window.TJFB.db.collection('users').doc(uid)),ref=window.TJFB.db.collection('clientData').doc(uid),snap=await tx.get(ref);
+  if(!ownerOk()||window.TJFB.auth.currentUser.uid!==actorUid||actor.data()?.role!=='owner'||actor.data()?.active!==true||customer.data()?.active!==true)throw Error('Sessão ou cadastro do cliente inválido.');
+  var d=snap.exists?snap.data():{}, arr=Array.isArray(d.chamados)?d.chamados:[], existente=arr.find(function(x){return String(x.num)===String(id);});
   var rec=Object.assign({},existente||{}, {num:id,equip:equip,cliente:cli.nome,clienteUid:uid,status:$v('admin-chamado-status').value,agend:agendamento,problema:problema,prioridade:$v('admin-chamado-prioridade').value,observacoes:$v('admin-chamado-obs').value});
+  var budgets=(d.orcamentos||[]).map(function(q){return Object.assign({},q);}),approved=budgets.find(function(q){return String(q.num)===budgetNumber;});
+  if(budgetNumber&&(!approved||approved.status!=='Aprovado'||approved.clienteUid&&approved.clienteUid!==uid))throw Error('Orçamento não está aprovado para este cliente. Atualize e confira.');
+  if(approved&&approved.chamado&&String(approved.chamado)!==String(id))throw Error('Este orçamento já está vinculado a outro chamado.');
+  budgets.forEach(function(q){if(String(q.chamado||'')===String(id)&&String(q.num)!==budgetNumber)q.chamado='';});
+  rec.orcamentoNum=budgetNumber;if(approved){approved.chamado=String(id);rec.totalOrcamento=approved.total;rec.itensOrcamento=normalizarItensOrcamento(approved.itens);}else{delete rec.totalOrcamento;delete rec.itensOrcamento;}
   var idx=arr.findIndex(function(x){return String(x.num)===String(id);});if(idx>=0)arr[idx]=rec;else arr.unshift(rec);
   var msgs=Object.assign({},d.mensagens||{});if(!msgs[id])msgs[id]=[{autor:'empresa',texto:'Chamado cadastrado pela TJ: '+problema,hora:'Agora'}];
   var ats=Object.assign({},d.atendimentos||{}), at=Object.assign({},ats[id]||{});at.endereco=$v('admin-chamado-endereco').value.trim();at.previsao=rec.agend;at.diag=at.diag||'';at.pecas=Array.isArray(at.pecas)?at.pecas:[];if(kmValue!==null)at.deslocamentoKm=kmValue;ats[id]=at;
   var hist=Array.isArray(d.historicoCliente)?d.historicoCliente:[];hist.unshift({data:hoje(),tipo:'chamado',titulo:(novo?'Chamado #'+id+' cadastrado pela TJ':'Chamado #'+id+' atualizado pela TJ'),desc:equip+' — '+problema,status:rec.status});
-  await gravarDados(uid,{chamados:arr,mensagens:msgs,atendimentos:ats,historicoCliente:hist});try{await window.TJMedia?.uploadOwnerDraft(uid,id);}catch(e){avisoV13('Chamado salvo; anexos não enviados: '+e.message);}await recarregarV13();avisoV13(novo?'Chamado cadastrado com sucesso.':'Chamado atualizado com sucesso.');abrirTela('tela-emp-chamados');
+  var schedules=(d.agendamentos||[]).map(function(a){return budgetNumber&&String(a.orcamentoNum||'')===budgetNumber?Object.assign({},a,{chamado:String(id)}):a;});
+  tx.set(ref,window.TJFirestoreSafe({chamados:arr,chamadoIds:arr.map(function(c){return String(c.num);}),orcamentos:budgets,agendamentos:schedules,mensagens:msgs,atendimentos:ats,historicoCliente:hist,atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()}),{merge:true});
+  });try{await window.TJMedia?.uploadOwnerDraft(uid,id);}catch(e){avisoV13('Chamado salvo; anexos não enviados: '+e.message);}await recarregarV13();avisoV13(novo?'Chamado cadastrado com sucesso.':'Chamado atualizado com sucesso.');abrirTela('tela-emp-chamados');
 }
 async function excluirChamado(id){
   var ch=(state.chamados||[]).find(function(x){return String(x.num)===String(id);});if(!ch)return;var uid=uidRegistro(ch);if(!uid)return avisoV13('Cliente do chamado não identificado.');
@@ -8201,10 +8226,10 @@ function normalizarHistOrcamento(lista){return (Array.isArray(lista)?lista:[]).m
 async function salvarOrcAdmin(){
   var id=$v('novo-orc-id').value,uid=$v('novo-orc-cli').value,oldUid=$v('novo-orc-uid-original').value,cli=clientePorUid(uid),serv=$v('novo-orc-servico').value.trim(),val=$v('novo-orc-valor').value.trim();
   if(!uid||!cli||!serv||!val)return avisoV13('Preencha cliente, serviço e valor.');
+  var itensTela=window.TJOrcamentoItens.ler();
   var novo=!id;if(novo)id=gerarNumero('',state.orcamentos,'num');
   if(oldUid&&oldUid!==uid)await removerRegistro(oldUid,'orcamentos',function(x){return String(x.num)===String(id);});
   var d=await lerDados(uid),arr=Array.isArray(d.orcamentos)?d.orcamentos:[],old=arr.find(function(x){return String(x.num)===String(id);});
-  var itensTela=lerItensOrcamentoTela();
   var itens=itensTela.length?itensTela:normalizarItensOrcamento(old&&old.itens);
   if(!itens.length)itens=[{descricao:serv,qtd:'1',valor:val}];
   var histOrc=normalizarHistOrcamento(old&&old.hist);
@@ -8280,7 +8305,7 @@ document.addEventListener('keydown',function(ev){
 },true);
 
 // Atualiza equipamentos do formulário de chamado quando o cliente muda.
-document.addEventListener('change',function(ev){if(ev.target&&ev.target.id==='admin-chamado-cliente')preencherEquipChamado(ev.target.value,'');},true);
+document.addEventListener('change',function(ev){if(ev.target&&ev.target.id==='admin-chamado-cliente'){preencherEquipChamado(ev.target.value,'');preencherOrcChamado(ev.target.value,'');}},true);
 
 // Ao abrir cadastro novo, restaura o modo criação.
 document.addEventListener('click',function(ev){var a=ev.target&&ev.target.closest?ev.target.closest('[data-action="abrir-novo-cliente-empresa"]'):null;if(!a)return;resetFormCliente();},true);
@@ -8609,7 +8634,7 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
     normalizarControles();
     var drawer=document.querySelector('.drawer-panel,.side-drawer,.sidebar');
     var antigo=drawer&&drawer.querySelector('.tj-v25-version');if(antigo)antigo.remove();
-    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v43';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
+    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v44';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
   });
   var obs=new MutationObserver(normalizarControles);document.addEventListener('DOMContentLoaded',function(){if(document.body)obs.observe(document.body,{childList:true,subtree:true});});
 })();
@@ -8617,5 +8642,5 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
 <script src="./assets/tj-orcamento-fluxo.js"></script><script src="./assets/tj-orcamento-decisao.js"></script>
 <script src="./assets/tj-cadastros.js"></script>
 <script src="./assets/tj-atendimento.js"></script>
-<script src="./assets/tj-cliente-acompanhamento.js"></script><script src="./assets/tj-atendimento-pecas.js"></script><script src="./assets/tj-deslocamento.js"></script><script src="./assets/tj-media-config.js"></script><script src="./assets/tj-chamado-media.js"></script><script src="./assets/tj-recibos.js"></script><script src="./assets/tj-financeiro.js"></script><script src="./assets/tj-layout.js"></script>
+<script src="./assets/tj-cliente-acompanhamento.js"></script><script src="./assets/tj-atendimento-pecas.js"></script><script src="./assets/tj-deslocamento.js"></script><script src="./assets/tj-media-config.js"></script><script src="./assets/tj-chamado-media.js"></script><script src="./assets/tj-recibos.js"></script><script src="./assets/tj-financeiro.js"></script><script src="./assets/tj-layout.js"></script><script src="./assets/tj-realtime.js"></script>
 </html>
