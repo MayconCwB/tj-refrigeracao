@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TJ Refrigeração">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <script src="./assets/tj-core.js"></script>
+  <script src="./assets/tj-core.js"></script><script src="./assets/tj-orcamento-equipamento.js"></script>
 <script src="./assets/tj-pwa-update.js"></script>
   <script>
   /* TJ v24 — tema Claro / Escuro / Sistema com preferência local */
@@ -2329,7 +2329,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
           <button type="button" class="btn-voltar" data-action="voltar">‹ Voltar</button>
           <div class="card-box">
             <div class="card-title" id="admin-orc-titulo">Emitir Novo Orçamento</div>
-            <input type="hidden" id="novo-orc-id" value="">
+            <div class="form-group"><label class="form-label" for="novo-orc-equipamento">Equipamento do cliente *</label><select id="novo-orc-equipamento" class="form-select"><option value="">Selecione o cliente primeiro</option></select></div><input type="hidden" id="novo-orc-id" value="">
             <input type="hidden" id="novo-orc-uid-original" value="">
             <form onsubmit="return false;">
               <div class="form-group">
@@ -3798,6 +3798,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 
           item.appendChild(top);
           item.appendChild(valor);
+          var equipmentLine=document.createElement("p");equipmentLine.textContent="Equipamento: "+window.TJBudgetEquipment.describe(o);item.appendChild(equipmentLine);
           box.appendChild(item);
         }
       }
@@ -3828,6 +3829,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 
       var cli = document.getElementById("det-orc-cliente");
       if (cli) cli.textContent = "Cliente: " + orc.cliente;
+      var equipmentBox=document.getElementById("det-orc-equipamento");if(!equipmentBox){equipmentBox=document.createElement("p");equipmentBox.id="det-orc-equipamento";equipmentBox.style.cssText="overflow-wrap:anywhere;margin:14px 0";cli.after(equipmentBox);}equipmentBox.textContent="Equipamento: "+window.TJBudgetEquipment.describe(orc);
 
       var tot = document.getElementById("det-orc-total");
       if (tot) tot.textContent = formatarMoedaBR(orc.total);
@@ -6605,7 +6607,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
     if(!linhas)linhas='<tr><td colspan="3">Nenhum item registrado.</td></tr>';
     var html=printHeader()
       +'<div class="tj-print-title"><h1>Orçamento #'+escV25(o.num)+'</h1><span>'+escV25(valor(o.status,'Sem status'))+'</span></div>'
-      +'<div class="tj-print-grid">'+field('Cliente',o.cliente)+field('Serviço',o.servico)+field('Status',o.status)+field('Data de emissão',hojeV25())+'</div>'
+      +'<div class="tj-print-grid">'+field('Cliente',o.cliente)+field('Equipamento',window.TJBudgetEquipment.describe(o))+field('Serviço',o.servico)+field('Status',o.status)+field('Data de emissão',hojeV25())+'</div>'
       +'<div class="tj-print-section"><h2>Itens e serviços cotados</h2><table class="tj-print-table"><thead><tr><th>Descrição</th><th>Qtd</th><th>Valor</th></tr></thead><tbody>'+linhas+'</tbody></table><div class="tj-print-total">Total: '+escV25(valor(o.total,'R$ 0,00'))+'</div></div>'
       +'<div class="tj-print-signatures"><div class="tj-print-signature">TJ Refrigeração</div><div class="tj-print-signature">Cliente / responsável</div></div>'
       +'<div class="tj-print-footer"><span>Documento gerado pelo portal TJ Refrigeração.</span><span>Emissão: '+escV25(hojeV25())+'</span></div>';
@@ -8105,7 +8107,9 @@ window.TJCallFromBudget=async function(uid,number){
   summary.replaceChildren();var title=document.createElement('strong');title.textContent='Orçamento aprovado #'+q.num+' — '+formatarMoedaBR(q.total);summary.append(title);
   normalizarItensOrcamento(q.itens).forEach(function(i){var row=document.createElement('p');row.textContent=i.descricao+' • Quantidade: '+i.qtd+' • Valor unitário: '+formatarMoedaBR(i.valor);summary.append(row);});
   var note=document.createElement('p');note.textContent='Os itens e valores aprovados ficarão vinculados ao chamado. Registre as peças efetivamente utilizadas durante o atendimento.';summary.append(note);
-  await preencherEquipChamado(uid,q.equip||q.equipamentoNome||'');
+  var quoteEquipment=window.TJBudgetEquipment.resolve(Object.assign({},q,{clienteUid:uid}));
+  await preencherEquipChamado(uid,quoteEquipment?.nome||q.equip||q.equipamentoNome||'');
+  if(q.equipamentoId){var equipmentSelect=$v('admin-chamado-equip'),equipmentOption=Array.from(equipmentSelect.options).find(function(o){return o.dataset.equipId===q.equipamentoId;});if(equipmentOption)equipmentOption.selected=true;}
   if(ownerOk()&&window.TJFB.auth.currentUser.uid===actorUid&&$v('admin-chamado-cliente').value===uid){var equipment=$v('admin-chamado-equip');if(!equipment.value&&equipment.options.length===2)equipment.selectedIndex=1;}
 };
 async function salvarChamado(){
@@ -8214,6 +8218,7 @@ function abrirFormOrc(obj,uidPreferido){
     var ph=document.createElement('option');ph.value='';ph.textContent='Selecione um cliente';
     sel.insertBefore(ph,sel.firstChild);sel.value='';
   }
+  window.TJBudgetEquipment.fill(sel.value,obj&&obj.equipamentoId);
   $v('novo-orc-id').value=obj?obj.num:'';
   $v('novo-orc-uid-original').value=obj?uid:'';
   $v('admin-orc-titulo').textContent=obj?'Editar Orçamento #'+obj.num:'Emitir Novo Orçamento';
@@ -8246,15 +8251,22 @@ function normalizarHistOrcamento(lista){return (Array.isArray(lista)?lista:[]).m
 async function salvarOrcAdmin(){
   var id=$v('novo-orc-id').value,uid=$v('novo-orc-cli').value,oldUid=$v('novo-orc-uid-original').value,cli=clientePorUid(uid),serv=$v('novo-orc-servico').value.trim(),val=$v('novo-orc-valor').value.trim();
   if(!uid||!cli||!serv||!val)return avisoV13('Preencha cliente, serviço e valor.');
+  var selectedEquipment=$v('novo-orc-equipamento'),equipmentId=selectedEquipment.value;
+  if(selectedEquipment.disabled)return avisoV13('Aguarde o carregamento dos equipamentos.');
+  if(!equipmentId)return avisoV13('Selecione o equipamento deste orçamento.');
+  var equipment=selectedEquipment._tjEquipment.find(function(e){return e.id===equipmentId;});
   var itensTela=window.TJOrcamentoItens.ler();
   var novo=!id;if(novo)id=gerarNumero('',state.orcamentos,'num');
   if(oldUid&&oldUid!==uid)await removerRegistro(oldUid,'orcamentos',function(x){return String(x.num)===String(id);});
   var d=await lerDados(uid),arr=Array.isArray(d.orcamentos)?d.orcamentos:[],old=arr.find(function(x){return String(x.num)===String(id);});
+  var liveEquipment=(d.equip||[]).find(function(e){return e.id===equipmentId;});
+  if(!liveEquipment&&(!old||old.equipamentoId!==equipmentId))return avisoV13('O equipamento não pertence a este cliente ou foi removido. Atualize o cadastro.');
+  var equipmentSnapshot=window.TJBudgetEquipment.snapshot(liveEquipment)||(old&&old.equipamento);
   var itens=itensTela.length?itensTela:normalizarItensOrcamento(old&&old.itens);
   if(!itens.length)itens=[{descricao:serv,qtd:'1',valor:val}];
   var histOrc=normalizarHistOrcamento(old&&old.hist);
   histOrc.push({data:hoje(),evento:novo?'Orçamento emitido pela TJ':'Orçamento atualizado pela TJ'});
-  var rec=Object.assign({},old||{},{num:id,servico:serv,cliente:cli.nome,clienteUid:uid,status:$v('novo-orc-status').value,total:val,itens:itens,hist:histOrc});
+  var rec=Object.assign({},old||{},{num:id,servico:serv,cliente:cli.nome,clienteUid:uid,status:$v('novo-orc-status').value,total:val,itens:itens,hist:histOrc,equipamentoId:equipmentId,equipamentoNome:equipmentSnapshot?.nome||old?.equipamentoNome||'',equipamento:equipmentSnapshot||null});
   var idx=arr.findIndex(function(x){return String(x.num)===String(id);});if(idx>=0)arr[idx]=rec;else arr.unshift(rec);
   var hist=Array.isArray(d.historicoCliente)?d.historicoCliente:[];hist.unshift({data:hoje(),tipo:'orcamento',titulo:'Orçamento #'+id+(novo?' emitido':' atualizado'),desc:serv+' — '+formatarMoedaBR(val),status:rec.status});
   var nots=Array.isArray(d.notificacoesCliente)?d.notificacoesCliente:[];if(novo)nots.unshift({data:hoje(),titulo:'Novo orçamento disponível',desc:'Orçamento #'+id+' aguarda sua análise.',lida:false});
@@ -8262,7 +8274,7 @@ async function salvarOrcAdmin(){
   await recarregarV13();orcamentoAtualNum=id;avisoV13(novo?'Orçamento criado e enviado ao cliente.':'Orçamento atualizado.');abrirTela('tela-emp-orcamentos');
 }
 async function excluirOrcAdmin(id){var o=(state.orcamentos||[]).find(function(x){return String(x.num)===String(id);});if(!o)return;var uid=uidRegistro(o);if(!uid)return avisoV13('Cliente do orçamento não identificado.');if(!confirm('Excluir o orçamento #'+id+'?'))return;await removerRegistro(uid,'orcamentos',function(x){return String(x.num)===String(id);});await recarregarV13();renderizarOrcamentosEmpresa();avisoV13('Orçamento excluído.');}
-renderizarOrcamentosEmpresa=function(){var box=$v('lista-emp-orcamentos');if(!box)return;box.innerHTML='';if(!(state.orcamentos||[]).length){box.innerHTML='<p class="admin-empty">Nenhum orçamento cadastrado.</p>';return;}(state.orcamentos||[]).forEach(function(o){var item=document.createElement('div');item.className='list-item admin-record';var top=document.createElement('div');top.className='list-header';var t=document.createElement('span');t.className='list-title';t.textContent='Orçamento #'+o.num+' — '+o.servico;top.appendChild(t);top.appendChild(criarBadge(o.status));var m=document.createElement('div');m.className='list-meta';m.textContent='Cliente: '+o.cliente+' • Total: '+formatarMoedaBR(o.total);item.appendChild(top);item.appendChild(m);var a=document.createElement('div');a.className='admin-card-actions';[['Ver','btn-tj-secondary','abrir-orc'],['✏️ Editar','btn-tj','admin-editar-orc'],['🗑️ Excluir','btn-tj-danger','admin-excluir-orc']].forEach(function(b){var bt=document.createElement('button');bt.type='button';bt.className=b[1];bt.textContent=b[0];bt.dataset.action=b[2];bt.dataset.id=o.num;a.appendChild(bt);});item.appendChild(a);box.appendChild(item);});};
+renderizarOrcamentosEmpresa=function(){var box=$v('lista-emp-orcamentos');if(!box)return;box.innerHTML='';if(!(state.orcamentos||[]).length){box.innerHTML='<p class="admin-empty">Nenhum orçamento cadastrado.</p>';return;}(state.orcamentos||[]).forEach(function(o){var item=document.createElement('div');item.className='list-item admin-record';var top=document.createElement('div');top.className='list-header';var t=document.createElement('span');t.className='list-title';t.textContent='Orçamento #'+o.num+' — '+o.servico;top.appendChild(t);top.appendChild(criarBadge(o.status));var m=document.createElement('div');m.className='list-meta';m.textContent='Cliente: '+o.cliente+' • Total: '+formatarMoedaBR(o.total)+' • Equipamento: '+window.TJBudgetEquipment.describe(o);item.appendChild(top);item.appendChild(m);var a=document.createElement('div');a.className='admin-card-actions';[['Ver','btn-tj-secondary','abrir-orc'],['✏️ Editar','btn-tj','admin-editar-orc'],['🗑️ Excluir','btn-tj-danger','admin-excluir-orc']].forEach(function(b){var bt=document.createElement('button');bt.type='button';bt.className=b[1];bt.textContent=b[0];bt.dataset.action=b[2];bt.dataset.id=o.num;a.appendChild(bt);});item.appendChild(a);box.appendChild(item);});};
 
 function abrirFormPedido(obj,uidPreferido){var uid=uidPreferido||uidRegistro(obj)||((clientesV13()[0]||{}).uid||'');preencherSelectClientes('admin-pedido-cliente',uid);$v('admin-pedido-id').value=obj?obj.num:'';$v('admin-pedido-uid-original').value=obj?uid:'';$v('admin-pedido-titulo').textContent=obj?'Editar Pedido #'+obj.num:'Cadastrar Pedido';$v('admin-pedido-peca').value=(obj&&obj.peca)||'';$v('admin-pedido-status').value=(obj&&obj.status)||'Solicitado';$v('admin-pedido-data').value=(obj&&obj.data)||hoje();abrirTela('tela-emp-form-pedido');}
 async function salvarPedido(){var id=$v('admin-pedido-id').value,uid=$v('admin-pedido-cliente').value,oldUid=$v('admin-pedido-uid-original').value,cli=clientePorUid(uid),peca=$v('admin-pedido-peca').value.trim();if(!uid||!cli||!peca)return avisoV13('Selecione o cliente e informe a peça.');var novo=!id;if(novo)id=gerarNumero('PED-',state.pedidos,'num');if(oldUid&&oldUid!==uid)await removerRegistro(oldUid,'pedidos',function(x){return x.num===id;});var d=await lerDados(uid),arr=Array.isArray(d.pedidos)?d.pedidos:[],rec=Object.assign({},arr.find(function(x){return x.num===id;})||{},{num:id,peca:peca,cliente:cli.nome,clienteUid:uid,status:$v('admin-pedido-status').value,data:$v('admin-pedido-data').value.trim()||hoje()}),idx=arr.findIndex(function(x){return x.num===id;});if(idx>=0)arr[idx]=rec;else arr.unshift(rec);await gravarDados(uid,{pedidos:arr});await recarregarV13();avisoV13(novo?'Pedido cadastrado.':'Pedido atualizado.');abrirTela('tela-emp-pedidos');}
@@ -8654,7 +8666,7 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
     normalizarControles();
     var drawer=document.querySelector('.drawer-panel,.side-drawer,.sidebar');
     var antigo=drawer&&drawer.querySelector('.tj-v25-version');if(antigo)antigo.remove();
-    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v45';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
+    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v46';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
   });
   var obs=new MutationObserver(normalizarControles);document.addEventListener('DOMContentLoaded',function(){if(document.body)obs.observe(document.body,{childList:true,subtree:true});});
 })();

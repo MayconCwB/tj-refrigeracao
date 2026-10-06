@@ -89,6 +89,7 @@
     loadParts().then(()=>parts.filter(p=>p.ativo).forEach(p=>catalog.append(new Option(p.nome+' — '+money(p.precoCentavos),p.id)))).catch(()=>{});
     catalog.addEventListener('change',()=>{const p=parts.find(p=>p.id===catalog.value);if(p)addItem(p.nome,decimal(p.precoCentavos));catalog.value='';});
     const travelKm=d.field('deslocamentoKm','Deslocamento previsto: quilômetros (ida e volta)','text','0'),travelRate=d.field('deslocamentoValorKm','Cobrança de deslocamento: valor por km (R$)','text','0,00');
+    const equipmentInfo=document.createElement('p');equipmentInfo.textContent='Equipamento: '+r.equipamentoNome;d.form.prepend(equipmentInfo);
     d.save.textContent='Enviar orçamento ao cliente';
     d.finish(async()=>{
       if(!actor()||!isOwner())throw new Error('Sua sessão mudou. Entre novamente.');
@@ -104,7 +105,8 @@
         // Separate customer documents can be written concurrently; avoid sharing a local counter.
         const random=new Uint32Array(1);crypto.getRandomValues(random);
         const num=String(Date.now())+String(random[0]).padStart(10,'0');
-        const quote={num,clienteUid:r.clienteUid,cliente:customer.data().nome,servico:desc.value.trim(),status:'Aguardando aprovação',total:decimal(total),itens:quoteItems,hist:[{data:date,evento:'Orçamento emitido pela TJ'}],solicitacaoId:r.id,equipamentoId:r.equipamentoId};
+        const eq=(current.equip||[]).find(e=>e.id===r.equipamentoId);
+        const quote={equipamento:window.TJBudgetEquipment.snapshot(eq)||{id:r.equipamentoId,nome:r.equipamentoNome,marca:'',modelo:'',sn:'',local:''},equipamentoNome:eq?.nome||r.equipamentoNome,num,clienteUid:r.clienteUid,cliente:customer.data().nome,servico:desc.value.trim(),status:'Aguardando aprovação',total:decimal(total),itens:quoteItems,hist:[{data:date,evento:'Orçamento emitido pela TJ'}],solicitacaoId:r.id,equipamentoId:r.equipamentoId};
         const patch={orcamentos:[quote,...existing],notificacoesCliente:[{data:date,titulo:'Novo orçamento disponível',desc:'Orçamento #'+num+' aguarda sua análise.',lida:false},...(current.notificacoesCliente||[])],historicoCliente:[{data:date,tipo:'orcamento',titulo:'Orçamento #'+num+' emitido',desc:quote.servico,status:quote.status},...(current.historicoCliente||[])],atualizadoEm:stamp()};
         tx.set(dataRef,window.TJFirestoreSafe(patch),{merge:true});tx.update(reqRef,{status:'Orçamento enviado',orcamentoNum:num,atualizadoEm:stamp()});
       });await fb().carregarDadosEmpresaFirebase();renderizarOrcamentosEmpresa();await loadRequests();toast('Orçamento enviado ao cliente.');
@@ -131,7 +133,7 @@
     const retired=['tela-emp-pedidos','tela-emp-form-pedido','tela-emp-pedido-detalhe','tela-detalhe-pedido'];retired.forEach(id=>$(id)?.remove());
     document.querySelectorAll('[data-action="admin-pedido-cliente-atual"],[data-action="abrir-novo-pedido"],[data-action="novo-pedido"]').forEach(el=>el.remove());
     const original=abrirTela;abrirTela=function(id,history){if(retired.includes(id))id='tela-emp-pecas';if(id==='tela-emp-pecas'&&!isOwner())return;const result=original(id,history);if(id==='tela-emp-pecas'){if(typeof atualizarBreadcrumb==='function')atualizarBreadcrumb([{label:'Peças'}]);loadParts().catch(e=>{$('tj-parts-list').textContent=e.message;});}if(id==='tela-cli-orcamentos'||id==='tela-emp-orcamentos')loadRequests();return result;};
-    const version=document.querySelector('.tj-v29-version');if(version)version.textContent='TJ Refrigeração • v45';
+    const version=document.querySelector('.tj-v29-version');if(version)version.textContent='TJ Refrigeração • v46';
     fb().auth.onAuthStateChanged(()=>{generation++;parts=[];requests=[];['tj-parts-list','tj-requests-client','tj-requests-owner'].forEach(id=>$(id)?.replaceChildren());});
   }
   setup();
