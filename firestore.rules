@@ -293,6 +293,23 @@ service cloud.firestore {
         && request.resource.data.clienteUid == resource.data.clienteUid;
       allow delete: if owner();
     }
+    function validPreventive(d) {
+      return d.keys().hasAll(['clienteUid','clienteNome','equipamentoId','equipamentoNome','dataRevisao','observacao','atualizadoPor','atualizadoEm'])
+        && d.keys().hasOnly(['clienteUid','clienteNome','equipamentoId','equipamentoNome','dataRevisao','observacao','atualizadoPor','atualizadoEm'])
+        && text(d.clienteUid,128) && d.clienteUid.size()>0 && active(d.clienteUid)
+        && text(d.clienteNome,200) && text(d.equipamentoId,80) && d.equipamentoId.size()>0
+        && text(d.equipamentoNome,200) && d.equipamentoNome.size()>0 && text(d.observacao,500)
+        && d.dataRevisao is string && d.dataRevisao.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && d.atualizadoPor==request.auth.uid && d.atualizadoEm==request.time;
+    }
+    match /manutencoesPreventivas/{id} {
+      allow read: if owner() || self(resource.data.clienteUid);
+      allow create: if owner() && validPreventive(request.resource.data);
+      allow update: if owner() && validPreventive(request.resource.data)
+        && request.resource.data.clienteUid==resource.data.clienteUid
+        && request.resource.data.equipamentoId==resource.data.equipamentoId;
+      allow delete: if owner();
+    }
     match /{document=**} { allow read,write: if false; }
   }
 }

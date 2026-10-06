@@ -133,7 +133,7 @@
     const retired=['tela-emp-pedidos','tela-emp-form-pedido','tela-emp-pedido-detalhe','tela-detalhe-pedido'];retired.forEach(id=>$(id)?.remove());
     document.querySelectorAll('[data-action="admin-pedido-cliente-atual"],[data-action="abrir-novo-pedido"],[data-action="novo-pedido"]').forEach(el=>el.remove());
     const original=abrirTela;abrirTela=function(id,history){if(retired.includes(id))id='tela-emp-pecas';if(id==='tela-emp-pecas'&&!isOwner())return;const result=original(id,history);if(id==='tela-emp-pecas'){if(typeof atualizarBreadcrumb==='function')atualizarBreadcrumb([{label:'Peças'}]);loadParts().catch(e=>{$('tj-parts-list').textContent=e.message;});}if(id==='tela-cli-orcamentos'||id==='tela-emp-orcamentos')loadRequests();return result;};
-    const version=document.querySelector('.tj-v29-version');if(version)version.textContent='TJ Refrigeração • v55';
+    const version=document.querySelector('.tj-v29-version');if(version)version.textContent='TJ Refrigeração • v56';
     fb().auth.onAuthStateChanged(()=>{generation++;parts=[];requests=[];['tj-parts-list','tj-requests-client','tj-requests-owner'].forEach(id=>$(id)?.replaceChildren());});
   }
   setup();
