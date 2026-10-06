@@ -10,7 +10,7 @@
     if(!core.equal(core.budgetReview(q),reviewed))throw Error('Os valores ou itens do orçamento mudaram. Feche e reabra a decisão para conferir.');
     if((data.historicoCliente||[]).length>=1000||(data.notificacoesCliente||[]).length>=500)throw Error('O histórico atingiu o limite permitido. Revise os registros antes de continuar.');
     const status=type==='aprovado'?'Aprovado':'Recusado',event=status+' pela TJ (proprietário)'+(type==='recusado'?' — '+why:'');
-    const next={...q,status,[type==='aprovado'?'aprovadoEm':'recusadoEm']:date,hist:[...(q.hist||[]),{data:date,evento:event}],decisaoResponsavel:{uid:actor,perfil:'owner',tipo:type,data:iso,motivo:type==='recusado'?why:''}};
+    const next={...q,status,[type==='aprovado'?'aprovadoEm':'recusadoEm']:date,hist:[...(q.hist||[]),{data:date,evento:event,responsavelUid:actor,responsavelPerfil:'owner',dataHora:iso}],decisaoResponsavel:{uid:actor,perfil:'owner',tipo:type,data:iso,motivo:type==='recusado'?why:''}};
     return{orcamentos:quotes.map(item=>item===q?next:item),historicoCliente:[{data:date,tipo:'orcamento',titulo:'Orçamento #'+num+' '+status.toLowerCase()+' pela TJ',desc:event,status},...(data.historicoCliente||[])],notificacoesCliente:[{data:date,titulo:'Orçamento #'+num+' '+status.toLowerCase()+' pela TJ',desc:event,lida:false},...(data.notificacoesCliente||[])]};
   }
   return{decide};

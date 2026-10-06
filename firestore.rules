@@ -121,7 +121,8 @@ service cloud.firestore {
       let event = b.status == 'Aprovado' ? 'Aprovado pelo cliente' : 'Recusado pelo cliente';
       let entry = hist[hist.size()-1];
       return hist.size() == old.size()+1 && hist.size()<=500 && hist == old.concat([entry])
-        && entry is map && entry.keys().hasOnly(['data','evento']) && text(entry.data,10) && entry.evento==event
+        && entry is map && entry.keys().hasOnly(['data','evento','responsavelUid','responsavelPerfil','dataHora']) && text(entry.data,10) && entry.evento==event
+        && ((!entry.keys().hasAny(['responsavelUid','responsavelPerfil','dataHora'])) || (entry.keys().hasAll(['responsavelUid','responsavelPerfil','dataHora']) && entry.responsavelUid==request.auth.uid && entry.responsavelPerfil=='cliente' && text(entry.dataHora,24) && entry.dataHora.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$')))
         && (b.status == 'Aprovado' ? (text(b.aprovadoEm,10) && b.aprovadoEm==entry.data && b.get('recusadoEm','')==a.get('recusadoEm',''))
           : (text(b.recusadoEm,10) && b.recusadoEm==entry.data && b.get('aprovadoEm','')==a.get('aprovadoEm','')));
     }
