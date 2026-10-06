@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v62-relatorios';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v63-relatorios';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
@@ -13,7 +13,7 @@ const APP_SHELL = [
   './assets/tj-media-config.js',
   './assets/tj-chamado-media.js',
   './assets/tj-recibos.js',
-  './assets/tj-layout.js', './assets/tj-realtime.js', './assets/tj-filtros.js', './assets/tj-equipamento-historico.js', './assets/tj-notificacoes-proprietario.js', './assets/tj-conta-topo.js', './assets/tj-preventiva.js', './assets/tj-relatorios.js', './assets/tj-historico-alteracoes.js', './assets/tj-garantias.js', './assets/vendor/jspdf-4.2.1.umd.min.js', './assets/tj-compartilhar.js', './assets/tj-pdf-visual.js',
+  './assets/tj-layout.js', './assets/tj-realtime.js', './assets/tj-filtros.js', './assets/tj-equipamento-historico.js', './assets/tj-notificacoes-proprietario.js', './assets/tj-conta-topo.js', './assets/tj-preventiva.js', './assets/tj-relatorios.js', './assets/tj-historico-alteracoes.js', './assets/tj-garantias.js', './assets/vendor/jspdf-4.2.1.umd.min.js', './assets/tj-compartilhar.js', './assets/tj-pdf-visual.js', './assets/tj-retorno-garantia.js',
   './assets/tj-financeiro.js',
   './assets/tj-cliente-acompanhamento.js',
   './manifest.webmanifest',
