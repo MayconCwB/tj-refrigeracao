@@ -83,11 +83,19 @@ service cloud.firestore {
         && (!('atualizadoEm' in d) || d.atualizadoEm is timestamp)
         && (!('clienteMutation' in d) || (d.clienteMutation is map && d.clienteMutation.keys().hasOnly(['mensagemChamado']) && text(d.clienteMutation.get('mensagemChamado',''),40)));
     }
+    function validEquipmentGroup(d,uid) {
+      return d.equipamentos is list && d.equipamentos.size()>0 && d.equipamentos.size()<=10
+        && d.equipamentos.toSet().size()==d.equipamentos.size()
+        && d.equipamentos.hasOnly(get(/databases/$(database)/documents/clientData/$(uid)).data.get('equip',[]))
+        && d.equipamentoId==d.equipamentos[0].id;
+    }
     function validCall(c, uid) {
-      return c is map && c.keys().hasOnly(['num','equip','cliente','clienteUid','problema','status','agend','criadoEm'])
-        && text(c.num,40) && c.num.matches('^[0-9]+$') && text(c.equip,200) && c.equip.size()>0
+      return c is map && c.keys().hasOnly(['num','equip','cliente','clienteUid','problema','status','agend','criadoEm','equipamentoId','equipamentos'])
+        && text(c.num,40) && c.num.matches('^[0-9]+$') && text(c.equip,2100) && c.equip.size()>0
         && text(c.problema,5000) && c.problema.size()>0 && c.clienteUid == uid
         && c.cliente == get(/databases/$(database)/documents/users/$(uid)).data.nome
+        && (('equipamentos' in c)==('equipamentoId' in c))
+        && (!('equipamentos' in c) || validEquipmentGroup(c,uid))
         && c.status == 'Aguardando início' && c.agend == 'Aguardando agendamento' && text(c.criadoEm,40);
     }
     function newCall(a,b,uid) {
@@ -220,7 +228,7 @@ service cloud.firestore {
     }
     function validRequest(d) {
       return d.keys().hasAll(['clienteUid','clienteNome','equipamentoId','equipamentoNome','descricao','status','criadoEm','atualizadoEm'])
-        && d.keys().hasOnly(['clienteUid','clienteNome','equipamentoId','equipamentoNome','descricao','status','criadoEm','atualizadoEm','orcamentoNum'])
+        && d.keys().hasOnly(['clienteUid','clienteNome','equipamentoId','equipamentoNome','descricao','status','criadoEm','atualizadoEm','orcamentoNum','equipamentos'])
         && text(d.clienteUid,128) && text(d.clienteNome,200) && text(d.equipamentoId,80) && d.equipamentoId.size()>0
         && text(d.equipamentoNome,200) && d.equipamentoNome.size()>0 && text(d.descricao,5000) && d.descricao.size()>0
         && d.status in ['Solicitado','Recusado','Orçamento enviado'] && d.criadoEm is timestamp && d.atualizadoEm==request.time
@@ -229,6 +237,7 @@ service cloud.firestore {
     match /solicitacoesOrcamento/{id} {
       allow read: if owner() || self(resource.data.clienteUid);
       allow create: if validRequest(request.resource.data) && self(request.resource.data.clienteUid)
+        && (!('equipamentos' in request.resource.data) || validEquipmentGroup(request.resource.data,request.resource.data.clienteUid))
         && request.resource.data.clienteNome==get(/databases/$(database)/documents/users/$(request.auth.uid)).data.nome
         && request.resource.data.status=='Solicitado' && request.resource.data.criadoEm==request.time;
       allow update: if owner() && validRequest(request.resource.data) && resource.data.status=='Solicitado'
@@ -241,7 +250,7 @@ service cloud.firestore {
         && d.keys().hasOnly(['numero','clienteUid','clienteNome','documento','endereco','chamadoNum','equipamento','descricao','valorCentavos','dataPagamento','pagamento','observacoes','empresa','emitidoPor','status','criadoEm','canceladoEm','canceladoPor','motivoCancelamento'])
         && text(d.numero,80) && d.numero == 'REC-'+id
         && text(d.clienteUid,128) && d.clienteUid.size()>0 && text(d.clienteNome,200) && d.clienteNome.size()>0
-        && text(d.documento,40) && text(d.endereco,500) && text(d.chamadoNum,40) && text(d.equipamento,200)
+        && text(d.documento,40) && text(d.endereco,500) && text(d.chamadoNum,40) && text(d.equipamento,2100)
         && text(d.descricao,5000) && d.descricao.size()>0 && text(d.observacoes,2000)
         && d.valorCentavos is int && d.valorCentavos>0 && d.valorCentavos<=99999999
         && d.dataPagamento is string && d.dataPagamento.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')

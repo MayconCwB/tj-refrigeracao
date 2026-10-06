@@ -9,6 +9,7 @@
     const id=r.equipamentoId||e?.id||'',name=e?.nome||r.equipamentoNome||r.equip||'Equipamento não informado';
     return{key:JSON.stringify([clientKey(r),id||name]),name,label:name+' — '+(r.cliente||'Cliente não informado'),detail:[name,e?.marca,e?.modelo,e?.sn,e?.local].filter(Boolean).join(' ')};
   }
+  function equipments(r,c){return r.equipamentos?.length?r.equipamentos.map(e=>equipment({...r,equipamentos:null,equipamentoId:e.id,equipamento:e,equip:e.nome,equipamentoNome:e.nome},c)):[equipment(r,c)];}
   function options(select,choices,placeholder){
     const old=select.value,oldLabel=select.selectedOptions[0]?.textContent;
     select.replaceChildren(new Option(placeholder,''));
@@ -32,14 +33,14 @@
     if(!c.panel)return;c.panel.hidden=!owner();if(!owner())return;
     const rows=state[c.data]||[];
     options(c.client,rows.map(r=>[clientKey(r),r.cliente||'Cliente não informado']),'Todos os clientes');
-    options(c.equipment,rows.filter(r=>!c.client.value||clientKey(r)===c.client.value).map(r=>{const e=equipment(r,c);return[e.key,e.label];}),'Todos os equipamentos');
+    options(c.equipment,rows.filter(r=>!c.client.value||clientKey(r)===c.client.value).flatMap(r=>equipments(r,c).map(e=>[e.key,e.label])),'Todos os equipamentos');
     options(c.status,rows.map(r=>[r.status||'Aguardando início',r.status||'Aguardando início']),'Todos os status');
     apply(c);
   }
   function apply(c){
     if(!owner())return;
     const rows=state[c.data]||[],cards=Array.from(document.getElementById(c.list).querySelectorAll(':scope > .admin-record')),terms=normalize(c.search.value).trim().split(/\s+/).filter(Boolean);let count=0;
-    rows.forEach((r,index)=>{const e=equipment(r,c),haystack=normalize([r.num,r.cliente,r.problema,r.servico,r.status,e.detail].filter(Boolean).join(' '));const visible=(!c.client.value||clientKey(r)===c.client.value)&&(!c.equipment.value||e.key===c.equipment.value)&&(!c.status.value||(r.status||'Aguardando início')===c.status.value)&&terms.every(t=>haystack.includes(t));if(visible)count++;if(cards[index]){cards[index].hidden=!visible;cards[index].classList.toggle('tj-filter-hidden',!visible);}});
+    rows.forEach((r,index)=>{const es=equipments(r,c),haystack=normalize([r.num,r.cliente,r.problema,r.servico,r.status,es.map(e=>e.detail).join(" ")].filter(Boolean).join(' '));const visible=(!c.client.value||clientKey(r)===c.client.value)&&(!c.equipment.value||es.some(e=>e.key===c.equipment.value))&&(!c.status.value||(r.status||'Aguardando início')===c.status.value)&&terms.every(t=>haystack.includes(t));if(visible)count++;if(cards[index]){cards[index].hidden=!visible;cards[index].classList.toggle('tj-filter-hidden',!visible);}});
     c.count.textContent=rows.length?(count?'Exibindo '+count+' de '+rows.length+' '+(c.id==='chamados'?'chamados':'orçamentos')+'.':'Nenhum resultado para os filtros selecionados. Toque em Limpar filtros para ver todos.'):'Nenhum '+(c.id==='chamados'?'chamado':'orçamento')+' cadastrado.';
   }
   const style=document.createElement('style');style.textContent='.tj-list-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0;padding:16px;border:1px solid var(--border);border-radius:12px}.tj-list-filters[hidden]{display:none!important}.tj-list-filters .form-group{margin:0;min-width:0}.tj-list-filters input,.tj-list-filters select{box-sizing:border-box;max-width:100%;min-width:0;width:100%}.tj-list-filters .admin-card-actions,.tj-filter-count{grid-column:1/-1}.tj-filter-count{margin:0;overflow-wrap:anywhere}.content-area #lista-emp-chamados>.tj-filter-hidden,.content-area #lista-emp-orcamentos>.tj-filter-hidden{display:none!important}@media(max-width:600px){.tj-list-filters{grid-template-columns:minmax(0,1fr);padding:12px}}';document.head.append(style);

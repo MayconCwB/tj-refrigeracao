@@ -15,7 +15,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TJ Refrigeração">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <script src="./assets/tj-core.js"></script><script src="./assets/tj-orcamento-equipamento.js"></script>
+  <script src="./assets/tj-core.js"></script><script src="./assets/tj-equipamentos-grupo.js"></script>
+<script src="./assets/tj-orcamento-equipamento.js"></script>
 <script src="./assets/tj-pwa-update.js"></script>
   <script>
   /* TJ v24 — tema Claro / Escuro / Sistema com preferência local */
@@ -3563,10 +3564,12 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
         if (eq.clienteUid ? eq.clienteUid === (window.TJFB && window.TJFB.auth.currentUser && window.TJFB.auth.currentUser.uid) : eq.cliente === clienteAtualNome) {
           var opt = document.createElement("option");
           opt.value = eq.nome;
+          opt.dataset.equipId=eq.id;
           opt.textContent = eq.nome + " (" + eq.marca + " " + eq.modelo + ")";
           sel.appendChild(opt);
         }
       }
+      window.TJEquipmentGroup.mount(sel,(state.equip||[]).filter(e=>!e.clienteUid||e.clienteUid===window.TJFB.auth.currentUser?.uid));
     }
 
     // DETALHE DO CHAMADO (CLIENTE)
@@ -7199,6 +7202,7 @@ function atualizarIdentidadeCliente(perfil){
   perfil=perfil||{};
   var nome=perfil.nome||perfil.empresa||perfil.razaoSocial||perfil.email||clienteAtualNome||"Cliente";
   clienteAtualNome=nome;
+  window.dispatchEvent(new Event('tj-profile-changed'));
   var saudacao=document.querySelector("#tela-cli-dash h2");
   if(saudacao) saudacao.textContent="Olá, "+nome+" 👋";
   var nomeInput=document.getElementById("cli-perfil-nome");
@@ -7591,8 +7595,8 @@ window.TJFB.enviarChamadoCliente=async function(){
   const data=new Date().toLocaleDateString('pt-BR');
   const local=(state.enderecosCliente||[]).find(function(e){return e.tipo==='Atendimento';})||(state.enderecosCliente||[])[0];
   const endereco=local?[local.rua,local.num,local.cidade].filter(Boolean).join(', '):'';
-  const registro={num:num,equip:equipamento,cliente:clienteAtualNome,clienteUid:user.uid,problema:problema,status:'Aguardando início',agend:'Aguardando agendamento',criadoEm:new Date().toISOString()};
-  const historico={data:data,tipo:'chamado',titulo:'Chamado #'+num+' aberto',desc:equipamento+' — '+problema,status:'Aberto'};
+  let callGroup;try{callGroup=window.TJEquipmentGroup.validate(window.TJEquipmentGroup.selected(document.getElementById('novo-chamado-equip')),state.equip||[]);}catch(e){aviso(e.message);return;}const registro={equipamentos:callGroup,equipamentoId:callGroup[0].id,num:num,equip:window.TJEquipmentGroup.names(callGroup),cliente:clienteAtualNome,clienteUid:user.uid,problema:problema,status:'Aguardando início',agend:'Aguardando agendamento',criadoEm:new Date().toISOString()};
+  const historico={data:data,tipo:'chamado',titulo:'Chamado #'+num+' aberto',desc:registro.equip+' — '+problema,status:'Aberto'};
   enviandoChamado=true;
   const botoes=document.querySelectorAll('[data-action="enviar-chamado"],[data-action="enviar-novo-chamado"]');
   botoes.forEach(function(b){b.disabled=true;});
@@ -7998,13 +8002,13 @@ function preencherSelectClientes(id, selecionado){
   if(selecionado) sel.value=selecionado;
 }
 var equipamentoChamadoCarga=0;
-async function preencherEquipChamado(uid, selecionado){
+async function preencherEquipChamado(uid, selecionado, groupIds=[]){
   var sel=$v('admin-chamado-equip');if(!sel)return;
   var carga=++equipamentoChamadoCarga, actorUid=window.TJFB.auth.currentUser&&window.TJFB.auth.currentUser.uid;
   function option(value,label){var op=document.createElement('option');op.value=value;op.textContent=label;sel.appendChild(op);return op;}
   var refresh=$v('admin-chamado-atualizar-equip');
-  if(!refresh){refresh=document.createElement('button');refresh.id='admin-chamado-atualizar-equip';refresh.type='button';refresh.className='btn-tj-secondary';refresh.textContent='Atualizar equipamentos';refresh.addEventListener('click',function(){preencherEquipChamado($v('admin-chamado-cliente').value,sel.value);});sel.parentNode.appendChild(refresh);}
-  sel.innerHTML='';sel.disabled=true;refresh.disabled=true;
+  if(!refresh){refresh=document.createElement('button');refresh.id='admin-chamado-atualizar-equip';refresh.type='button';refresh.className='btn-tj-secondary';refresh.textContent='Atualizar equipamentos';refresh.addEventListener('click',function(){preencherEquipChamado($v('admin-chamado-cliente').value,sel.value,window.TJEquipmentGroup.selected(sel).map(e=>e.id));});sel.parentNode.appendChild(refresh);}
+  document.getElementById(sel.id+'-extras')?.remove();sel._tjGroupList=[];sel._tjGroupSelected=new Set();sel.innerHTML='';sel.disabled=true;refresh.disabled=true;
   if(!uid){option('','Selecione um cliente primeiro');refresh.disabled=false;return;}
   option('','Carregando equipamentos…');
   try{
@@ -8016,14 +8020,14 @@ async function preencherEquipChamado(uid, selecionado){
     if(!lista.length)option('','Nenhum equipamento cadastrado para este cliente');
     else {option('','Selecione o equipamento');lista.forEach(function(e){if(!e.nome)return;var op=option(e.nome,e.nome+(e.marca?' — '+e.marca:'')+(e.sn?' • S/N: '+e.sn:''));op.dataset.equipId=e.id||'';});}
     if(selecionado){if(lista.some(function(e){return e.nome===selecionado;}))sel.value=selecionado;else if(('admin-chamado-id').value&&('admin-chamado-uid-original').value===uid){option(selecionado,selecionado+' (equipamento anterior do chamado)');sel.value=selecionado;}}
-    sel.disabled=false;preencherOrcChamado(uid,$v('admin-chamado-orcamento').value);
+    window.TJEquipmentGroup.mount(sel,lista,groupIds);sel.disabled=false;preencherOrcChamado(uid,$v('admin-chamado-orcamento').value);
   }catch(e){if(carga!==equipamentoChamadoCarga)return;sel.innerHTML='';option('','Falha ao carregar. Clique em Atualizar equipamentos.');sel.disabled=true;}
   finally{if(carga===equipamentoChamadoCarga)refresh.disabled=false;}
 }
 
 function preencherOrcChamado(uid,selected){
   var sel=$v('admin-chamado-orcamento'),equipment=$v('admin-chamado-equip'),equipmentId=equipment.selectedOptions[0]?.dataset.equipId||'';
-  var budgets=(state.orcamentos||[]).filter(function(q){return equipmentId&&q.clienteUid===uid&&q.status==='Aprovado'&&q.equipamentoId===equipmentId;});
+  var budgets=(state.orcamentos||[]).filter(function(q){return equipmentId&&q.clienteUid===uid&&q.status==='Aprovado'&&window.TJEquipmentGroup.same(q,{equipamentos:window.TJEquipmentGroup.selected(equipment)});});
   sel.replaceChildren(new Option(!equipmentId?'Selecione o equipamento primeiro':budgets.length?'Sem orçamento vinculado':'Nenhum orçamento aprovado para este equipamento',''));
   budgets.forEach(function(q){sel.appendChild(new Option('#'+q.num+' — '+q.servico+' — '+formatarMoedaBR(q.total),String(q.num)));});
   sel.disabled=!equipmentId;
@@ -8033,7 +8037,7 @@ function abrirFormChamado(obj, uidPreferido){
   document.getElementById('tj-call-budget-summary')?.remove();
   var uid=uidPreferido||uidRegistro(obj)||((clientesV13()[0]||{}).uid||'');
   preencherSelectClientes('admin-chamado-cliente',uid);
-  preencherEquipChamado(uid,obj&&obj.equip).then(function(){if($v('admin-chamado-cliente').value===uid){if(obj?.equipamentoId){var option=Array.from($v('admin-chamado-equip').options).find(function(o){return o.dataset.equipId===obj.equipamentoId;});if(option)option.selected=true;}preencherOrcChamado(uid,obj&&obj.orcamentoNum);}});
+  preencherEquipChamado(uid,obj&&obj.equip,window.TJEquipmentGroup.ids(obj)).then(function(){if($v('admin-chamado-cliente').value===uid){if(obj?.equipamentoId){var option=Array.from($v('admin-chamado-equip').options).find(function(o){return o.dataset.equipId===obj.equipamentoId;});if(option)option.selected=true;}preencherOrcChamado(uid,obj&&obj.orcamentoNum);}});
   preencherOrcChamado(uid,'');
   $v('admin-chamado-id').value=obj?obj.num:'';$v('admin-chamado-uid-original').value=obj?uid:'';
   $v('admin-chamado-titulo').textContent=obj?'Editar Chamado #'+obj.num:'Cadastrar Chamado';
@@ -8067,7 +8071,7 @@ window.TJCallFromBudget=async function(uid,number){
   normalizarItensOrcamento(q.itens).forEach(function(i){var row=document.createElement('p');row.textContent=i.descricao+' • Quantidade: '+i.qtd+' • Valor unitário: '+formatarMoedaBR(i.valor);summary.append(row);});
   var note=document.createElement('p');note.textContent='Os itens e valores aprovados ficarão vinculados ao chamado. Registre as peças efetivamente utilizadas durante o atendimento.';summary.append(note);
   var quoteEquipment=window.TJBudgetEquipment.resolve(Object.assign({},q,{clienteUid:uid}));
-  await preencherEquipChamado(uid,quoteEquipment?.nome||q.equip||q.equipamentoNome||'');
+  await preencherEquipChamado(uid,quoteEquipment?.nome||q.equip||q.equipamentoNome||'',window.TJEquipmentGroup.ids(q));
   if(q.equipamentoId){var equipmentSelect=$v('admin-chamado-equip'),equipmentOption=Array.from(equipmentSelect.options).find(function(o){return o.dataset.equipId===q.equipamentoId;});if(equipmentOption)equipmentOption.selected=true;}
   if(ownerOk()&&window.TJFB.auth.currentUser.uid===actorUid&&$v('admin-chamado-cliente').value===uid){var equipment=$v('admin-chamado-equip');if(!equipment.value&&equipment.options.length===2)equipment.selectedIndex=1;}
   preencherOrcChamado(uid,String(number));
@@ -8088,7 +8092,7 @@ async function salvarChamado(){
     var od=await lerDados(oldUid), oa=Array.isArray(od.chamados)?od.chamados:[];oa=oa.filter(function(x){return String(x.num)!==String(id);});
     var om=Object.assign({},od.mensagens||{}), ot=Object.assign({},od.atendimentos||{});delete om[id];delete ot[id];await gravarDados(oldUid,{chamados:oa,mensagens:om,atendimentos:ot});
   }
-  var selectedEquipmentId=$v('admin-chamado-equip').selectedOptions[0]?.dataset.equipId||'';
+  var selectedGroup=window.TJEquipmentGroup.selected($v('admin-chamado-equip')),selectedEquipmentId=selectedGroup[0]?.id||'';
   var budgetNumber=$v('admin-chamado-orcamento').value,actorUid=window.TJFB.auth.currentUser.uid;
   await window.TJFB.db.runTransaction(async function(tx){
   var actor=await tx.get(window.TJFB.db.collection('users').doc(actorUid)),customer=await tx.get(window.TJFB.db.collection('users').doc(uid)),ref=window.TJFB.db.collection('clientData').doc(uid),snap=await tx.get(ref);
@@ -8097,8 +8101,8 @@ async function salvarChamado(){
   var rec=Object.assign({},existente||{}, {num:id,equip:equip,cliente:cli.nome,clienteUid:uid,status:$v('admin-chamado-status').value,agend:agendamento,problema:problema,prioridade:$v('admin-chamado-prioridade').value,observacoes:$v('admin-chamado-obs').value});
   var budgets=(d.orcamentos||[]).map(function(q){return Object.assign({},q);}),approved=budgets.find(function(q){return String(q.num)===budgetNumber;});
   if(budgetNumber&&(!approved||approved.status!=='Aprovado'||approved.clienteUid&&approved.clienteUid!==uid))throw Error('Orçamento não está aprovado para este cliente. Atualize e confira.');
-  if(approved&&(!selectedEquipmentId||approved.equipamentoId!==selectedEquipmentId||!(d.equip||[]).some(function(e){return e.id===selectedEquipmentId&&e.nome===equip;})))throw Error('O orçamento não corresponde ao equipamento selecionado. Atualize e confira.');
-  rec.equipamentoId=selectedEquipmentId;
+  var liveGroup=window.TJEquipmentGroup.validate(selectedGroup,d.equip||[]);if(approved&&(!selectedEquipmentId||!window.TJEquipmentGroup.same(approved,{equipamentos:liveGroup})))throw Error('O orçamento não corresponde ao equipamento selecionado. Atualize e confira.');
+  rec.equipamentoId=selectedEquipmentId;rec.equipamentos=liveGroup.map(window.TJBudgetEquipment.snapshot);rec.equip=window.TJEquipmentGroup.names(liveGroup);
   if(approved&&approved.chamado&&String(approved.chamado)!==String(id))throw Error('Este orçamento já está vinculado a outro chamado.');
   budgets.forEach(function(q){if(String(q.chamado||'')===String(id)&&String(q.num)!==budgetNumber)q.chamado='';});
   rec.orcamentoNum=budgetNumber;if(approved){approved.chamado=String(id);rec.totalOrcamento=approved.total;rec.itensOrcamento=normalizarItensOrcamento(approved.itens);}else{delete rec.totalOrcamento;delete rec.itensOrcamento;}
@@ -8181,7 +8185,7 @@ function abrirFormOrc(obj,uidPreferido){
     var ph=document.createElement('option');ph.value='';ph.textContent='Selecione um cliente';
     sel.insertBefore(ph,sel.firstChild);sel.value='';
   }
-  window.TJBudgetEquipment.fill(sel.value,obj&&obj.equipamentoId);
+  window.TJBudgetEquipment.fill(sel.value,obj&&obj.equipamentoId,window.TJEquipmentGroup.ids(obj));
   $v('novo-orc-id').value=obj?obj.num:'';
   $v('novo-orc-uid-original').value=obj?uid:'';
   $v('admin-orc-titulo').textContent=obj?'Editar Orçamento #'+obj.num:'Emitir Novo Orçamento';
@@ -8222,14 +8226,14 @@ async function salvarOrcAdmin(){
   var novo=!id;if(novo)id=gerarNumero('',state.orcamentos,'num');
   if(oldUid&&oldUid!==uid)await removerRegistro(oldUid,'orcamentos',function(x){return String(x.num)===String(id);});
   var d=await lerDados(uid),arr=Array.isArray(d.orcamentos)?d.orcamentos:[],old=arr.find(function(x){return String(x.num)===String(id);});
-  var liveEquipment=(d.equip||[]).find(function(e){return e.id===equipmentId;});
+  var group=window.TJEquipmentGroup.validate(window.TJEquipmentGroup.selected(selectedEquipment),d.equip||[]);var liveEquipment=group[0];equipmentId=liveEquipment.id;
   if(!liveEquipment&&(!old||old.equipamentoId!==equipmentId))return avisoV13('O equipamento não pertence a este cliente ou foi removido. Atualize o cadastro.');
-  var equipmentSnapshot=window.TJBudgetEquipment.snapshot(liveEquipment)||(old&&old.equipamento);
+  if(old?.chamado&&!window.TJEquipmentGroup.same(old,{equipamentos:group}))return avisoV13('Este orçamento já tem um chamado vinculado. Mantenha os equipamentos aprovados.');var equipmentSnapshot=window.TJBudgetEquipment.snapshot(liveEquipment)||(old&&old.equipamento);
   var itens=itensTela.length?itensTela:normalizarItensOrcamento(old&&old.itens);
   if(!itens.length)itens=[{descricao:serv,qtd:'1',valor:val}];
   var histOrc=normalizarHistOrcamento(old&&old.hist);
   histOrc.push({data:hoje(),evento:novo?'Orçamento emitido pela TJ':'Orçamento atualizado pela TJ'});
-  var rec=Object.assign({},old||{},{num:id,servico:serv,cliente:cli.nome,clienteUid:uid,status:$v('novo-orc-status').value,total:val,itens:itens,hist:histOrc,equipamentoId:equipmentId,equipamentoNome:equipmentSnapshot?.nome||old?.equipamentoNome||'',equipamento:equipmentSnapshot||null});
+  var rec=Object.assign({},old||{},{num:id,servico:serv,cliente:cli.nome,clienteUid:uid,status:$v('novo-orc-status').value,total:val,itens:itens,hist:histOrc,equipamentoId:equipmentId,equipamentoNome:equipmentSnapshot?.nome||old?.equipamentoNome||'',equipamento:equipmentSnapshot||null,equipamentos:group.map(window.TJBudgetEquipment.snapshot)});
   var idx=arr.findIndex(function(x){return String(x.num)===String(id);});if(idx>=0)arr[idx]=rec;else arr.unshift(rec);
   var hist=Array.isArray(d.historicoCliente)?d.historicoCliente:[];hist.unshift({data:hoje(),tipo:'orcamento',titulo:'Orçamento #'+id+(novo?' emitido':' atualizado'),desc:serv+' — '+formatarMoedaBR(val),status:rec.status});
   var nots=Array.isArray(d.notificacoesCliente)?d.notificacoesCliente:[];if(novo)nots.unshift({data:hoje(),titulo:'Novo orçamento disponível',desc:'Orçamento #'+id+' aguarda sua análise.',lida:false});
@@ -8629,7 +8633,7 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
     normalizarControles();
     var drawer=document.querySelector('.drawer-panel,.side-drawer,.sidebar');
     var antigo=drawer&&drawer.querySelector('.tj-v25-version');if(antigo)antigo.remove();
-    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v53';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
+    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v55';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
   });
   var obs=new MutationObserver(normalizarControles);document.addEventListener('DOMContentLoaded',function(){if(document.body)obs.observe(document.body,{childList:true,subtree:true});});
 })();

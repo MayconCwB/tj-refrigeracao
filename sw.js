@@ -1,8 +1,8 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v53-saida-topo';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v55-varios-equipamentos';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
-  './assets/tj-orcamento-equipamento.js',
+  './assets/tj-orcamento-equipamento.js', './assets/tj-equipamentos-grupo.js',
   './assets/tj-pwa-update.js',
   './assets/tj-orcamento-fluxo.js',
   './assets/tj-orcamento-decisao.js',

@@ -4,7 +4,7 @@
   let selected=null,generation=0;
   const uidOf=e=>e.clienteUid||(state.perfilSessao==='cliente'?window.TJFB.auth.currentUser?.uid:'');
   function match(record,e,all){
-    if(record.equipamentoId)return String(record.equipamentoId)===String(e.id);
+    if(record.equipamentos?.length)return record.equipamentos.some(x=>String(x.id)===String(e.id));if(record.equipamentoId)return String(record.equipamentoId)===String(e.id);
     const name=record.equipamentoNome||record.equipamento?.nome||record.equip;
     return !!name&&name===e.nome&&all.filter(x=>x.nome===name).length===1;
   }
@@ -27,10 +27,10 @@
         body.append(el('p',calls.length+' chamados • '+quotes.length+' orçamentos'));
         body.append(el('p','Valores de orçamento e peças utilizadas são apresentados separadamente. Não representam pagamentos recebidos.','list-meta'));
         rows(body,'Atendimentos e peças utilizadas',calls,(card,c)=>{
-          const at=data.atendimentos?.[c.num]||{};card.append(el('strong','Chamado #'+c.num),criarBadge(c.status||'Sem status'),el('p','Data: '+(c.data||'Não informada')),el('p','Solicitação: '+(c.problema||'Não informada')),el('p','Diagnóstico / serviço realizado: '+(at.diag||'Ainda não registrado')));
+          const at=data.atendimentos?.[c.num]||{};card.append(el('p',c.equipamentos?.length>1?'Atendimento em conjunto: '+window.TJEquipmentGroup.names(c.equipamentos):''),el('strong','Chamado #'+c.num),criarBadge(c.status||'Sem status'),el('p','Data: '+(c.data||'Não informada')),el('p','Solicitação: '+(c.problema||'Não informada')),el('p','Diagnóstico / serviço realizado: '+(at.diag||'Ainda não registrado')));
           const parts=at.pecas||[];card.append(el('strong','Peças utilizadas'));if(!parts.length)card.append(el('p','Nenhuma peça registrada.','list-meta'));parts.forEach(p=>{const name=Array.isArray(p)?p[0]:p.descricao||p.nome||p.item,qty=Array.isArray(p)?p[1]:p.qtd||p.quantidade,value=Array.isArray(p)?p[2]:p.valor??p.preco;card.append(el('p',(name||'Peça')+' • Quantidade: '+(qty||'Não informada')+' • Valor unitário: '+money(value)));});
         });
-        rows(body,'Orçamentos vinculados',quotes,(card,q)=>{card.append(el('strong','Orçamento #'+q.num),criarBadge(q.status||'Sem status'),el('p',q.servico||'Serviço não informado'),el('p','Total orçado: '+money(q.total)));});
+        rows(body,'Orçamentos vinculados',quotes,(card,q)=>{card.append(el('strong','Orçamento #'+q.num),criarBadge(q.status||'Sem status'),el('p',q.servico||'Serviço não informado'),el('p',(q.equipamentos?.length>1?'Total do orçamento em conjunto: ':'Total orçado: ')+money(q.total)));});
       }catch(err){if(!d.isConnected||token!==generation||auth.currentUser?.uid!==account)return;body.replaceChildren(el('p','Não foi possível carregar o histórico. Confira sua conexão.'));const retry=el('button','Tentar novamente','btn-tj-secondary');retry.type='button';retry.addEventListener('click',load);body.append(retry);}
     }await load();
   }

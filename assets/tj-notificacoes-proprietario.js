@@ -7,7 +7,7 @@
   function identity(kind,uid,id){return JSON.stringify([kind,uid,String(id)]);}
   function events(){
     const calls=(state.chamados||[]).filter(c=>c.clienteUid).map(c=>({id:identity('call',c.clienteUid,c.num),title:'Chamado #'+c.num,desc:(c.cliente||'Cliente')+' • '+(c.equip||'Equipamento não informado')+' • '+(c.problema||''),status:c.status||'Aberto',date:c.data||'',screen:'tela-emp-chamados'}));
-    const quotes=requests.map(r=>({id:identity('request',r.clienteUid,r.id),title:'Solicitação de orçamento',desc:(r.clienteNome||r.cliente||'Cliente')+' • '+(r.equipamentoNome||'Equipamento não informado')+' • '+(r.problema||r.descricao||''),status:r.status||'Solicitado',date:r.criadoEm?.toDate?.().toLocaleDateString('pt-BR')||'',screen:'tela-emp-orcamentos'}));
+    const quotes=requests.map(r=>({id:identity('request',r.clienteUid,r.id),title:'Solicitação de orçamento',desc:(r.clienteNome||r.cliente||'Cliente')+' • '+(r.equipamentos?.length?window.TJEquipmentGroup.names(r.equipamentos):r.equipamentoNome||'Equipamento não informado')+' • '+(r.problema||r.descricao||''),status:r.status||'Solicitado',date:r.criadoEm?.toDate?.().toLocaleDateString('pt-BR')||'',screen:'tela-emp-orcamentos'}));
     return [...quotes,...calls];
   }
   function persist(){try{localStorage.setItem(key(),JSON.stringify([...seen].slice(-3000)));}catch(e){toast('Não foi possível guardar a leitura neste dispositivo.');}}
