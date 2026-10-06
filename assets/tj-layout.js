@@ -46,6 +46,14 @@
   labels(document.body);
   const observer=new MutationObserver(changes=>changes.forEach(change=>{labels(change.target);change.addedNodes.forEach(labels);}));
   observer.observe(document.body,{childList:true,subtree:true});
+  // O campo inteiro abre o calendário, inclusive fora do ícone nativo.
+  const callDate=document.getElementById('admin-chamado-data');
+  if(callDate){
+    callDate.style.cursor='pointer';
+    function openCalendar(){if(typeof callDate.showPicker==='function'&&!callDate.disabled&&!callDate.readOnly){try{callDate.showPicker();}catch(e){/* Preserva o seletor nativo quando o navegador não permite a abertura. */}}}
+    callDate.addEventListener('click',openCalendar);
+    callDate.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&typeof callDate.showPicker==='function'){event.preventDefault();openCalendar();}});
+  }
   // Each navigation starts at the top of the actual scrolling area, rather than the locked page.
   if(typeof abrirTela==='function'){
     const navigate=abrirTela;abrirTela=function(){const result=navigate.apply(this,arguments),main=document.querySelector('#painel-principal .content-area');if(main){main.scrollTop=0;main.scrollLeft=0;}return result;};
