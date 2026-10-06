@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v52-conta-topo';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v53-saida-topo';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
