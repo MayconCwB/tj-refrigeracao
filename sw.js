@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v48-correcao-recibo';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v49-busca-filtros';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
@@ -13,7 +13,7 @@ const APP_SHELL = [
   './assets/tj-media-config.js',
   './assets/tj-chamado-media.js',
   './assets/tj-recibos.js',
-  './assets/tj-layout.js', './assets/tj-realtime.js',
+  './assets/tj-layout.js', './assets/tj-realtime.js', './assets/tj-filtros.js',
   './assets/tj-financeiro.js',
   './assets/tj-cliente-acompanhamento.js',
   './manifest.webmanifest',
