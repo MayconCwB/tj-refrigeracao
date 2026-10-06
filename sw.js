@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v47-filtro-equipamento';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v48-correcao-recibo';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
