@@ -8,10 +8,10 @@
     const q=matches[0];if(q.clienteUid&&q.clienteUid!==uid)throw Error('O orçamento pertence a outro cliente.');
     if(q.status!=='Aguardando aprovação')throw Error('Este orçamento já recebeu uma decisão. Atualize a lista.');
     if(!core.equal(core.budgetReview(q),reviewed))throw Error('Os valores ou itens do orçamento mudaram. Feche e reabra a decisão para conferir.');
-    if((data.historicoCliente||[]).length>=1000||(data.notificacoesCliente||[]).length>=500)throw Error('O histórico atingiu o limite permitido. Revise os registros antes de continuar.');
+    if((data.historicoCliente||[]).filter(h=>!!h._ownerOnly===!!q._ownerOnly).length>=1000||(!q._ownerOnly&&(data.notificacoesCliente||[]).length>=500))throw Error('O histórico atingiu o limite permitido. Revise os registros antes de continuar.');
     const status=type==='aprovado'?'Aprovado':'Recusado',event=status+' pela TJ (proprietário)'+(type==='recusado'?' — '+why:'');
     const next={...q,status,[type==='aprovado'?'aprovadoEm':'recusadoEm']:date,hist:[...(q.hist||[]),{data:date,evento:event,responsavelUid:actor,responsavelPerfil:'owner',dataHora:iso}],decisaoResponsavel:{uid:actor,perfil:'owner',tipo:type,data:iso,motivo:type==='recusado'?why:''}};
-    return{orcamentos:quotes.map(item=>item===q?next:item),historicoCliente:[{data:date,tipo:'orcamento',titulo:'Orçamento #'+num+' '+status.toLowerCase()+' pela TJ',desc:event,status},...(data.historicoCliente||[])],notificacoesCliente:[{data:date,titulo:'Orçamento #'+num+' '+status.toLowerCase()+' pela TJ',desc:event,lida:false},...(data.notificacoesCliente||[])]};
+    return{orcamentos:quotes.map(item=>item===q?next:item),historicoCliente:[{data:date,tipo:'orcamento',titulo:'Orçamento #'+num+' '+status.toLowerCase()+' pela TJ',desc:event,status},...(data.historicoCliente||[])],notificacoesCliente:q._ownerOnly?(data.notificacoesCliente||[]):[{data:date,titulo:'Orçamento #'+num+' '+status.toLowerCase()+' pela TJ',desc:event,lida:false},...(data.notificacoesCliente||[])]};
   }
   return{decide};
 });
@@ -26,7 +26,7 @@
   function open(q,type){
     if(!owner()||q.status!=='Aguardando aprovação'||!q.clienteUid||document.querySelector('dialog.tj-owner-budget-dialog'))return;
     const uid=q.clienteUid,actor=fb().auth.currentUser.uid,reviewed=window.TJCore.budgetReview(q),d=document.createElement('dialog');d.className='tj-owner-budget-dialog';const form=document.createElement('form');form.append(text('h2',type==='aprovado'?'Aprovar orçamento pela TJ':'Recusar orçamento pela TJ'),text('p','Orçamento #'+q.num+' • '+q.cliente+' • '+formatarMoedaBR(q.total)),text('p',q.servico));
-    form.append(text('p','A decisão será registrada como feita pelo proprietário e aparecerá no histórico do cliente.'));
+    form.append(text('p',q._ownerOnly?'A decisão será registrada no histórico interno. O cliente não recebe aviso automático.':'A decisão será registrada como feita pelo proprietário e aparecerá no histórico do cliente.'));
     let reason=null;if(type==='recusado'){const label=text('label','Motivo da recusa');reason=document.createElement('textarea');reason.id='tj-owner-budget-reason';reason.name='motivo';reason.className='form-textarea';reason.required=true;reason.maxLength=500;reason.rows=3;label.htmlFor=reason.id;form.append(label,reason);}
     const error=text('p','');error.setAttribute('role','alert');const row=document.createElement('div');row.className='admin-card-actions';let busy=false;const save=button(type==='aprovado'?'Confirmar aprovação':'Confirmar recusa',null,true);save.type='submit';row.append(save,button('Cancelar',()=>{if(!busy)d.close();}));form.append(error,row);d.append(form);d.addEventListener('close',()=>d.remove());d.addEventListener('cancel',e=>{if(busy)e.preventDefault();});document.body.append(d);d.showModal();
     form.onsubmit=async event=>{event.preventDefault();if(busy)return;busy=true;error.textContent='';form.querySelectorAll('button,textarea').forEach(el=>el.disabled=true);let patch;

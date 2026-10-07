@@ -78,11 +78,11 @@
   }
   function renderRequests(){const box=requestContainer();if(!box)return;box.replaceChildren();if(!requests.length){box.textContent='Nenhuma solicitação de orçamento.';return;}
     requests.forEach(r=>{const card=document.createElement('div');card.className='tj-register-record';const title=document.createElement('strong');title.textContent=(r.equipamentos?.length?window.TJEquipmentGroup.names(r.equipamentos):r.equipamentoNome)+' — '+r.status;const text=document.createElement('p');text.textContent=(isOwner()?r.clienteNome+'\n':'')+r.descricao+(r.orcamentoNum?'\nOrçamento #'+r.orcamentoNum:'');card.append(title,text);
-      if(isOwner()&&r.status==='Solicitado'){card.append(button('Emitir orçamento',()=>quoteDialog(r)),button('Recusar solicitação',()=>rejectRequest(r),'btn-tj-secondary'));}box.append(card);});
+      if(isOwner()&&r.status==='Solicitado'){card.append(button('Gerar orçamento',()=>quoteDialog(r)),button('Recusar solicitação',()=>rejectRequest(r),'btn-tj-secondary'));}box.append(card);});
   }
   async function rejectRequest(r){if(!confirm('Recusar esta solicitação de orçamento?'))return;try{await fb().db.runTransaction(async tx=>{const ref=fb().db.collection('solicitacoesOrcamento').doc(r.id),doc=await tx.get(ref);if(doc.data()?.status!=='Solicitado')throw new Error('Esta solicitação já foi atendida.');tx.update(ref,{status:'Recusado',atualizadoEm:stamp()});});await loadRequests();}catch(e){toast(e.message);}}
   function quoteDialog(r){
-    const d=dialog('Emitir orçamento para '+r.clienteNome),desc=d.field('servico','Serviço','textarea',r.descricao,2000),catalog=d.field('catalogo','Adicionar peça do catálogo','select');desc.required=true;
+    const d=dialog('Gerar orçamento para '+r.clienteNome),desc=d.field('servico','Serviço','textarea',r.descricao,2000),catalog=d.field('catalogo','Adicionar peça do catálogo','select');desc.required=true;
     catalog.append(new Option('Selecione uma peça',''));const rows=document.createElement('div');d.form.append(rows);let items=[];
     function addItem(description='',price=''){const row=document.createElement('div');row.className='tj-register-record';const text=document.createElement('input'),qty=document.createElement('input'),value=document.createElement('input');text.className=qty.className=value.className='form-input';text.placeholder='Descrição';text.setAttribute('aria-label','Descrição do item');text.maxLength=200;text.value=description;text.required=true;qty.type='number';qty.min='1';qty.max='10000';qty.step='1';qty.value='1';qty.required=true;qty.setAttribute('aria-label','Quantidade');value.placeholder='Valor unitário (R$)';value.setAttribute('aria-label','Valor unitário');value.inputMode='decimal';value.value=price;value.required=true;const item={text,qty,value};items.push(item);row.append(text,qty,value,button('Remover item',()=>{items=items.filter(x=>x!==item);row.remove();},'btn-tj-secondary'));rows.append(row);}
     d.form.append(button('Adicionar serviço / item',()=>addItem(),'btn-tj-secondary'));addItem('Serviço');
@@ -90,7 +90,7 @@
     catalog.addEventListener('change',()=>{const p=parts.find(p=>p.id===catalog.value);if(p)addItem(p.nome,decimal(p.precoCentavos));catalog.value='';});
     const travelKm=d.field('deslocamentoKm','Deslocamento previsto: quilômetros (ida e volta)','text','0'),travelRate=d.field('deslocamentoValorKm','Cobrança de deslocamento: valor por km (R$)','text','0,00');
     const equipmentInfo=document.createElement('p');equipmentInfo.textContent='Equipamentos: '+(r.equipamentos?.length?window.TJEquipmentGroup.names(r.equipamentos):r.equipamentoNome);d.form.prepend(equipmentInfo);
-    d.save.textContent='Enviar orçamento ao cliente';
+    d.save.textContent='Gerar orçamento';
     d.finish(async()=>{
       if(!actor()||!isOwner())throw new Error('Sua sessão mudou. Entre novamente.');
       if(!items.length||!desc.value.trim())throw new Error('Informe o serviço e pelo menos um item.');
@@ -106,10 +106,10 @@
         const random=new Uint32Array(1);crypto.getRandomValues(random);
         const num=String(Date.now())+String(random[0]).padStart(10,'0');
         const liveGroup=window.TJEquipmentGroup.validate(window.TJEquipmentGroup.list(r),current.equip||[]),eq=liveGroup[0];
-        const quote={equipamentos:liveGroup.map(window.TJBudgetEquipment.snapshot),equipamento:window.TJBudgetEquipment.snapshot(eq)||{id:r.equipamentoId,nome:r.equipamentoNome,marca:'',modelo:'',sn:'',local:''},equipamentoNome:eq?.nome||r.equipamentoNome,num,clienteUid:r.clienteUid,cliente:customer.data().nome,servico:desc.value.trim(),status:'Aguardando aprovação',total:decimal(total),itens:quoteItems,hist:[{data:date,evento:'Orçamento emitido pela TJ'}],solicitacaoId:r.id,equipamentoId:r.equipamentoId};
-        const patch={orcamentos:[quote,...existing],notificacoesCliente:[{data:date,titulo:'Novo orçamento disponível',desc:'Orçamento #'+num+' aguarda sua análise.',lida:false},...(current.notificacoesCliente||[])],historicoCliente:[{data:date,tipo:'orcamento',titulo:'Orçamento #'+num+' emitido',desc:quote.servico,status:quote.status},...(current.historicoCliente||[])],atualizadoEm:stamp()};
-        tx.set(dataRef,window.TJFirestoreSafe(patch),{merge:true});tx.update(reqRef,{status:'Orçamento enviado',orcamentoNum:num,atualizadoEm:stamp()});
-      });await fb().carregarDadosEmpresaFirebase();renderizarOrcamentosEmpresa();await loadRequests();toast('Orçamento enviado ao cliente.');
+        const quote={_ownerOnly:true,equipamentos:liveGroup.map(window.TJBudgetEquipment.snapshot),equipamento:window.TJBudgetEquipment.snapshot(eq)||{id:r.equipamentoId,nome:r.equipamentoNome,marca:'',modelo:'',sn:'',local:''},equipamentoNome:eq?.nome||r.equipamentoNome,num,clienteUid:r.clienteUid,cliente:customer.data().nome,servico:desc.value.trim(),status:'Aguardando aprovação',total:decimal(total),itens:quoteItems,hist:[{data:date,evento:'Orçamento emitido pela TJ'}],solicitacaoId:r.id,equipamentoId:r.equipamentoId};
+        const patch={orcamentos:[quote,...existing],notificacoesCliente:current.notificacoesCliente||[],historicoCliente:[{data:date,tipo:'orcamento',titulo:'Orçamento #'+num+' emitido',desc:quote.servico,status:quote.status},...(current.historicoCliente||[])],atualizadoEm:stamp()};
+        tx.set(dataRef,window.TJFirestoreSafe(patch),{merge:true});tx.update(reqRef,{status:'Orçamento gerado',orcamentoNum:num,atualizadoEm:stamp()});
+      });await fb().carregarDadosEmpresaFirebase();renderizarOrcamentosEmpresa();await loadRequests();toast('Orçamento gerado. Compartilhe o PDF ou imprima para entregar ao cliente.');
     });
   }
   async function loadParts(){if(!isOwner()||!actor())throw new Error('Área restrita à empresa.');const uid=actor().uid;const snap=await fb().db.collection('pecas').get();if(actor()?.uid!==uid||!isOwner())return;parts=snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));renderParts();}
@@ -133,7 +133,7 @@
     const retired=['tela-emp-pedidos','tela-emp-form-pedido','tela-emp-pedido-detalhe','tela-detalhe-pedido'];retired.forEach(id=>$(id)?.remove());
     document.querySelectorAll('[data-action="admin-pedido-cliente-atual"],[data-action="abrir-novo-pedido"],[data-action="novo-pedido"]').forEach(el=>el.remove());
     const original=abrirTela;abrirTela=function(id,history){if(retired.includes(id))id='tela-emp-pecas';if(id==='tela-emp-pecas'&&!isOwner())return;const result=original(id,history);if(id==='tela-emp-pecas'){if(typeof atualizarBreadcrumb==='function')atualizarBreadcrumb([{label:'Peças'}]);loadParts().catch(e=>{$('tj-parts-list').textContent=e.message;});}if(id==='tela-cli-orcamentos'||id==='tela-emp-orcamentos')loadRequests();return result;};
-    const version=document.querySelector('.tj-v29-version');if(version)version.textContent='TJ Refrigeração • v68';
+    const version=document.querySelector('.tj-v29-version');if(version)version.textContent='TJ Refrigeração • v69';
     fb().auth.onAuthStateChanged(()=>{generation++;parts=[];requests=[];['tj-parts-list','tj-requests-client','tj-requests-owner'].forEach(id=>$(id)?.replaceChildren());});
   }
   setup();

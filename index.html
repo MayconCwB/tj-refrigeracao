@@ -2274,7 +2274,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
               <span>Orçamentos Emitidos</span>
               <button type="button" class="btn-tj" data-action="criar-orcamento">+ CRIAR ORÇAMENTO</button>
             </div>
-            <p class="card-subtitle">Controle de orçamentos e propostas comerciais enviadas aos clientes.</p>
+            <p class="card-subtitle">Novos orçamentos ficam somente com o proprietário. Gere, revise e compartilhe o PDF ou imprima.</p>
             <div id="lista-emp-orcamentos" class="list-container">
               <!-- Dinâmico -->
             </div>
@@ -2285,7 +2285,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
         <section id="tela-form-novo-orcamento" class="hidden">
           <button type="button" class="btn-voltar" data-action="voltar">‹ Voltar</button>
           <div class="card-box">
-            <div class="card-title" id="admin-orc-titulo">Emitir Novo Orçamento</div>
+            <div class="card-title" id="admin-orc-titulo">Gerar Novo Orçamento</div>
             <div class="form-group"><label class="form-label" for="novo-orc-equipamento">Equipamento do cliente *</label><select id="novo-orc-equipamento" class="form-select"><option value="">Selecione o cliente primeiro</option></select></div><input type="hidden" id="novo-orc-id" value="">
             <input type="hidden" id="novo-orc-uid-original" value="">
             <form onsubmit="return false;">
@@ -2318,7 +2318,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
               </div>
 
               <button type="button" class="btn-tj" style="width: 100%; margin-top: 10px;" data-action="salvar-novo-orcamento">
-                Salvar e Enviar ao Cliente
+                Gerar orçamento
               </button>
             </form>
           </div>
@@ -7320,7 +7320,7 @@ async function carregarDadosEmpresaFirebase(liveSnapshots){
     const [snapClients,snapUsers,snapData]=liveSnapshots||await Promise.all([
       db.collection('clients').get(),
       db.collection('users').get(),
-      db.collection('clientData').get()
+      window.TJFB.db.collection('clientData').get()
     ]);
 
     if(auth.currentUser?.uid!==loadingAccount||state.perfilSessao!=='empresa')return false;
@@ -7442,7 +7442,7 @@ window.TJFirestoreSafe=function(payload){
   function pecaAtend(p){
     if(Array.isArray(p)) return {descricao:String(p[0]||''),qtd:String(p[1]||''),valor:String(p[2]||'')};
     p=p||{};
-    return {descricao:String(p.descricao||p.item||p.nome||''),qtd:String(p.qtd||p.quantidade||''),valor:String(p.valor||p.preco||'')};
+    return {descricao:String(p.descricao||p.item||p.nome||''),qtd:String(p.qtd||p.quantidade||''),valor:String(p.valor||p.preco||''),...(p.pecaId?{pecaId:String(p.pecaId),estoqueQtd:Number(p.estoqueQtd||0)}:{})};
   }
   if(Array.isArray(out.orcamentos)){
     out.orcamentos=out.orcamentos.map(function(o){
@@ -8151,7 +8151,7 @@ async function excluirClienteAdmin(uid){
   var refData=dbv.collection('clientData').doc(uid);
   var refUser=dbv.collection('users').doc(uid);
   batch.delete(refCli);
-  batch.delete(refData);
+  batch.delete(refData);batch.delete(dbv.collection('orcamentosProprietario').doc(uid));
   batch.set(refUser,{
     role:'cliente',
     active:false,
@@ -8188,7 +8188,7 @@ function abrirFormOrc(obj,uidPreferido){
   window.TJBudgetEquipment.fill(sel.value,obj&&obj.equipamentoId,window.TJEquipmentGroup.ids(obj));
   $v('novo-orc-id').value=obj?obj.num:'';
   $v('novo-orc-uid-original').value=obj?uid:'';
-  $v('admin-orc-titulo').textContent=obj?'Editar Orçamento #'+obj.num:'Emitir Novo Orçamento';
+  $v('admin-orc-titulo').textContent=obj?'Editar Orçamento #'+obj.num:'Gerar Novo Orçamento';
   $v('novo-orc-servico').value=(obj&&obj.servico)||'';
   $v('novo-orc-valor').value=(obj&&obj.total)||'';
   $v('novo-orc-status').value=(obj&&obj.status)||'Aguardando aprovação';
@@ -8233,12 +8233,12 @@ async function salvarOrcAdmin(){
   if(!itens.length)itens=[{descricao:serv,qtd:'1',valor:val}];
   var histOrc=normalizarHistOrcamento(old&&old.hist);
   histOrc.push({data:hoje(),evento:novo?'Orçamento emitido pela TJ':'Orçamento atualizado pela TJ'});
-  var rec=Object.assign({},old||{},{num:id,servico:serv,cliente:cli.nome,clienteUid:uid,status:$v('novo-orc-status').value,total:val,itens:itens,hist:histOrc,equipamentoId:equipmentId,equipamentoNome:equipmentSnapshot?.nome||old?.equipamentoNome||'',equipamento:equipmentSnapshot||null,equipamentos:group.map(window.TJBudgetEquipment.snapshot)});
+  var rec=Object.assign({},old||{},{num:id,servico:serv,cliente:cli.nome,clienteUid:uid,status:$v('novo-orc-status').value,_ownerOnly:novo?true:old?._ownerOnly===true,total:val,itens:itens,hist:histOrc,equipamentoId:equipmentId,equipamentoNome:equipmentSnapshot?.nome||old?.equipamentoNome||'',equipamento:equipmentSnapshot||null,equipamentos:group.map(window.TJBudgetEquipment.snapshot)});
   var idx=arr.findIndex(function(x){return String(x.num)===String(id);});if(idx>=0)arr[idx]=rec;else arr.unshift(rec);
   var hist=Array.isArray(d.historicoCliente)?d.historicoCliente:[];hist.unshift({data:hoje(),tipo:'orcamento',titulo:'Orçamento #'+id+(novo?' emitido':' atualizado'),desc:serv+' — '+formatarMoedaBR(val),status:rec.status});
-  var nots=Array.isArray(d.notificacoesCliente)?d.notificacoesCliente:[];if(novo)nots.unshift({data:hoje(),titulo:'Novo orçamento disponível',desc:'Orçamento #'+id+' aguarda sua análise.',lida:false});
+  var nots=Array.isArray(d.notificacoesCliente)?d.notificacoesCliente:[];
   await gravarDados(uid,{orcamentos:arr,historicoCliente:hist,notificacoesCliente:nots});
-  await recarregarV13();orcamentoAtualNum=id;avisoV13(novo?'Orçamento criado e enviado ao cliente.':'Orçamento atualizado.');abrirTela('tela-emp-orcamentos');
+  await recarregarV13();orcamentoAtualNum=id;avisoV13(novo?'Orçamento gerado. Compartilhe o PDF ou imprima para entregar ao cliente.':'Orçamento atualizado.');abrirTela('tela-emp-orcamentos');
 }
 async function excluirOrcAdmin(id){var o=(state.orcamentos||[]).find(function(x){return String(x.num)===String(id);});if(!o)return;var uid=uidRegistro(o);if(!uid)return avisoV13('Cliente do orçamento não identificado.');if(!confirm('Excluir o orçamento #'+id+'?'))return;await removerRegistro(uid,'orcamentos',function(x){return String(x.num)===String(id);});await recarregarV13();renderizarOrcamentosEmpresa();avisoV13('Orçamento excluído.');}
 renderizarOrcamentosEmpresa=function(){var box=$v('lista-emp-orcamentos');if(!box)return;box.innerHTML='';if(!(state.orcamentos||[]).length){box.innerHTML='<p class="admin-empty">Nenhum orçamento cadastrado.</p>';return;}(state.orcamentos||[]).forEach(function(o){var item=document.createElement('div');item.className='list-item admin-record';var top=document.createElement('div');top.className='list-header';var t=document.createElement('span');t.className='list-title';t.textContent='Orçamento #'+o.num+' — '+o.servico;top.appendChild(t);top.appendChild(criarBadge(o.status));var m=document.createElement('div');m.className='list-meta';m.textContent='Cliente: '+o.cliente+' • Total: '+formatarMoedaBR(o.total)+' • Equipamento: '+window.TJBudgetEquipment.describe(o);item.appendChild(top);item.appendChild(m);var a=document.createElement('div');a.className='admin-card-actions';[['Ver','btn-tj-secondary','abrir-orc'],['✏️ Editar','btn-tj','admin-editar-orc'],['🗑️ Excluir','btn-tj-danger','admin-excluir-orc']].forEach(function(b){var bt=document.createElement('button');bt.type='button';bt.className=b[1];bt.textContent=b[0];bt.dataset.action=b[2];bt.dataset.id=o.num;a.appendChild(bt);});item.appendChild(a);box.appendChild(item);});};
@@ -8633,7 +8633,7 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
     normalizarControles();
     var drawer=document.querySelector('.drawer-panel,.side-drawer,.sidebar');
     var antigo=drawer&&drawer.querySelector('.tj-v25-version');if(antigo)antigo.remove();
-    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v68';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
+    if(drawer&&!drawer.querySelector('.tj-v29-version')){var v=document.createElement('div');v.className='tj-v29-version';v.textContent='TJ Refrigeração • v69';v.style.cssText='font-size:10px;opacity:.5;padding:10px 14px;text-align:center;';drawer.appendChild(v);}
   });
   var obs=new MutationObserver(normalizarControles);document.addEventListener('DOMContentLoaded',function(){if(document.body)obs.observe(document.body,{childList:true,subtree:true});});
 })();
@@ -8645,5 +8645,5 @@ html[data-theme="dark"] #painel-principal .tj-dash-hero{background:linear-gradie
 <script src="./assets/tj-equipamento-historico.js"></script>
 <script src="./assets/tj-notificacoes-proprietario.js"></script>
 <script src="./assets/tj-conta-topo.js"></script>
-<script src="./assets/tj-preventiva.js"></script><script src="./assets/tj-relatorios.js"></script><script src="./assets/tj-historico-alteracoes.js"></script><script src="./assets/tj-garantias.js"></script><script src="./assets/vendor/jspdf-4.2.1.umd.min.js"></script><script src="./assets/tj-pdf-visual.js"></script><script src="./assets/tj-compartilhar.js"></script><script src="./assets/tj-retorno-garantia.js"></script><script src="./assets/tj-agenda-calendario.js"></script><script src="./assets/tj-estoque.js"></script><script src="./assets/tj-inicio-proprietario.js"></script><script src="./assets/tj-cliente-historico-completo.js"></script>
+<script src="./assets/tj-preventiva.js"></script><script src="./assets/tj-relatorios.js"></script><script src="./assets/tj-historico-alteracoes.js"></script><script src="./assets/tj-garantias.js"></script><script src="./assets/vendor/jspdf-4.2.1.umd.min.js"></script><script src="./assets/tj-pdf-visual.js"></script><script src="./assets/tj-compartilhar.js"></script><script src="./assets/tj-retorno-garantia.js"></script><script src="./assets/tj-agenda-calendario.js"></script><script src="./assets/tj-estoque.js"></script><script src="./assets/tj-inicio-proprietario.js"></script><script src="./assets/tj-cliente-historico-completo.js"></script><script src="./assets/tj-orcamentos-privados.js"></script>
 </html>

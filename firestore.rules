@@ -210,6 +210,19 @@ service cloud.firestore {
       allow update: if validData(request.resource.data) && (owner() || (self(uid) && customerChanges(resource.data,request.resource.data,uid)));
       allow delete: if owner();
     }
+    // Budgets generated from v69 onward are private to active owners.
+    function validOwnerBudgets(d, uid) {
+      return d.keys().hasOnly(['clienteUid','orcamentos','historicoCliente','atualizadoEm'])
+        && d.keys().hasAll(['clienteUid','atualizadoEm']) && d.clienteUid==uid
+        && (!('orcamentos' in d) || (d.orcamentos is list && d.orcamentos.size()<=500))
+        && (!('historicoCliente' in d) || (d.historicoCliente is list && d.historicoCliente.size()<=1000))
+        && d.atualizadoEm==request.time;
+    }
+    match /orcamentosProprietario/{uid} {
+      allow read: if owner();
+      allow create, update: if owner() && validOwnerBudgets(request.resource.data,uid);
+      allow delete: if owner();
+    }
     function validPart(d) {
       return d.keys().hasAll(['nome','codigo','marca','descricao','unidade','custoCentavos','precoCentavos','estoque','ativo','criadoEm','atualizadoEm'])
         && d.keys().hasOnly(['nome','codigo','ncm','marca','descricao','unidade','custoCentavos','precoCentavos','estoque','ativo','criadoEm','atualizadoEm','estoqueMinimo'])
@@ -250,8 +263,8 @@ service cloud.firestore {
         && d.keys().hasOnly(['clienteUid','clienteNome','equipamentoId','equipamentoNome','descricao','status','criadoEm','atualizadoEm','orcamentoNum','equipamentos'])
         && text(d.clienteUid,128) && text(d.clienteNome,200) && text(d.equipamentoId,80) && d.equipamentoId.size()>0
         && text(d.equipamentoNome,200) && d.equipamentoNome.size()>0 && text(d.descricao,5000) && d.descricao.size()>0
-        && d.status in ['Solicitado','Recusado','Orçamento enviado'] && d.criadoEm is timestamp && d.atualizadoEm==request.time
-        && (d.status=='Orçamento enviado' ? text(d.orcamentoNum,40) && d.orcamentoNum.size()>0 : !('orcamentoNum' in d));
+        && d.status in ['Solicitado','Recusado','Orçamento enviado','Orçamento gerado'] && d.criadoEm is timestamp && d.atualizadoEm==request.time
+        && (d.status in ['Orçamento enviado','Orçamento gerado'] ? text(d.orcamentoNum,40) && d.orcamentoNum.size()>0 : !('orcamentoNum' in d));
     }
     match /solicitacoesOrcamento/{id} {
       allow read: if owner() || self(resource.data.clienteUid);
@@ -260,7 +273,7 @@ service cloud.firestore {
         && request.resource.data.clienteNome==get(/databases/$(database)/documents/users/$(request.auth.uid)).data.nome
         && request.resource.data.status=='Solicitado' && request.resource.data.criadoEm==request.time;
       allow update: if owner() && validRequest(request.resource.data) && resource.data.status=='Solicitado'
-        && request.resource.data.status in ['Recusado','Orçamento enviado']
+        && request.resource.data.status in ['Recusado','Orçamento enviado','Orçamento gerado']
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','orcamentoNum','atualizadoEm']);
       allow delete: if owner();
     }
