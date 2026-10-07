@@ -212,7 +212,8 @@ service cloud.firestore {
     }
     function validPart(d) {
       return d.keys().hasAll(['nome','codigo','marca','descricao','unidade','custoCentavos','precoCentavos','estoque','ativo','criadoEm','atualizadoEm'])
-        && d.keys().hasOnly(['nome','codigo','ncm','marca','descricao','unidade','custoCentavos','precoCentavos','estoque','ativo','criadoEm','atualizadoEm'])
+        && d.keys().hasOnly(['nome','codigo','ncm','marca','descricao','unidade','custoCentavos','precoCentavos','estoque','ativo','criadoEm','atualizadoEm','estoqueMinimo'])
+        && (!('estoqueMinimo' in d) || (d.estoqueMinimo is int && d.estoqueMinimo>=0 && d.estoqueMinimo<=1000000))
         && (!('ncm' in d) || (d.ncm is string && d.ncm.matches('^[0-9]{8}$')))
         && text(d.nome,200) && d.nome.size()>0 && text(d.codigo,80) && d.codigo.size()>0
         && text(d.marca,100) && text(d.descricao,2000) && d.unidade in ['un','kg','m','l','kit']
@@ -226,6 +227,23 @@ service cloud.firestore {
       allow create: if owner() && validPart(request.resource.data) && ('ncm' in request.resource.data) && request.resource.data.criadoEm==request.time;
       allow update: if owner() && validPart(request.resource.data) && request.resource.data.criadoEm==resource.data.criadoEm;
       allow delete: if owner();
+    }
+    // Owner-only immutable stock movements; existing balances are not backfilled.
+    function validStockMovement(d) {
+      return d.keys().hasAll(['pecaId','pecaNome','codigo','antes','depois','quantidade','tipo','motivo','clienteUid','chamadoNum','responsavelUid','criadoEm'])
+        && d.keys().hasOnly(['pecaId','pecaNome','codigo','antes','depois','quantidade','tipo','motivo','clienteUid','chamadoNum','responsavelUid','criadoEm'])
+        && text(d.pecaId,128) && d.pecaId.size()>0 && text(d.pecaNome,200) && text(d.codigo,80)
+        && d.antes is int && d.antes>=0 && d.antes<=1000000 && d.depois is int && d.depois>=0 && d.depois<=1000000
+        && d.quantidade is int && d.quantidade==d.depois-d.antes
+        && d.tipo in ['Saldo inicial','Entrada','Saída manual','Ajuste','Uso no chamado','Devolução do chamado']
+        && text(d.motivo,500) && d.motivo.size()>0 && text(d.clienteUid,128) && text(d.chamadoNum,128)
+        && d.responsavelUid==request.auth.uid && d.criadoEm==request.time
+        && getAfter(/databases/$(database)/documents/pecas/$(d.pecaId)).data.estoque==d.depois;
+    }
+    match /movimentacoesEstoque/{id} {
+      allow read: if owner();
+      allow create: if owner() && validStockMovement(request.resource.data);
+      allow update, delete: if false;
     }
     function validRequest(d) {
       return d.keys().hasAll(['clienteUid','clienteNome','equipamentoId','equipamentoNome','descricao','status','criadoEm','atualizadoEm'])
