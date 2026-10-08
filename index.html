@@ -491,6 +491,7 @@ function TJMostrarLanding(){
   TJMostrarLogin();
 }
 function TJMostrarLogin(){
+  if(window.TJLimparAcesso) window.TJLimparAcesso();
   var auth=document.getElementById('auth-container');
   var painel=document.getElementById('painel-principal');
   var login=document.getElementById('tela-login');
@@ -849,13 +850,13 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
         <form onsubmit="return false;" style="display: flex; flex-direction: column; gap: 12px;">
           <div class="form-group">
             <label class="form-label" for="login-email">E-mail</label>
-            <input type="email" id="login-email" class="form-input" value="" placeholder="seu@email.com">
+            <input type="email" id="login-email" autocomplete="off" class="form-input" value="" placeholder="seu@email.com">
           </div>
           
           <div class="form-group">
             <label class="form-label" for="login-senha">Senha</label>
             <div style="position: relative;">
-              <input type="password" id="login-senha" class="form-input" value="" placeholder="••••••••">
+              <input type="password" id="login-senha" autocomplete="off" class="form-input" value="" placeholder="••••••••">
               <button type="button" class="tj-password-toggle" data-action="toggle-pwd" data-id="login-senha" aria-controls="login-senha" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="tj-password-slash" d="m3 3 18 18" style="display:none"/></svg></button>
             </div>
           </div>
@@ -899,13 +900,13 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
         
         <div class="form-group">
           <label class="form-label" for="email-empresa-input">E-mail do proprietário</label>
-          <input type="email" id="email-empresa-input" class="form-input" placeholder="E-mail do proprietário">
+          <input type="email" id="email-empresa-input" autocomplete="off" class="form-input" placeholder="E-mail do proprietário">
         </div>
         
         <div class="form-group">
           <label class="form-label" for="senha-empresa-input">Senha do proprietário</label>
           <div style="position: relative;">
-            <input type="password" id="senha-empresa-input" class="form-input" placeholder="Digite a senha restrita">
+            <input type="password" id="senha-empresa-input" autocomplete="off" class="form-input" placeholder="Digite a senha restrita">
             <button type="button" class="tj-password-toggle" data-action="toggle-pwd" data-id="senha-empresa-input" aria-controls="senha-empresa-input" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="tj-password-slash" d="m3 3 18 18" style="display:none"/></svg></button>
           </div>
           <div id="erro-senha-empresa" class="form-error">Senha incorreta. Tente novamente.</div>
@@ -6942,15 +6943,58 @@ function aviso(msg){
 }
 function msgErro(e){
   const c=(e&&e.code)||'';
-  if(c==='auth/email-already-in-use') return 'Este e-mail já tem uma conta. Faça login.';
-  if(c==='auth/invalid-email') return 'E-mail inválido.';
-  if(c==='auth/weak-password') return 'A senha precisa ter pelo menos 6 caracteres.';
-  if(c==='auth/user-not-found'||c==='auth/wrong-password'||c==='auth/invalid-credential') return 'E-mail ou senha incorretos.';
-  if(c==='auth/too-many-requests') return 'Muitas tentativas. Aguarde um momento e tente novamente.';
-  if(c==='auth/operation-not-allowed') return 'O login por e-mail/senha ainda não foi ativado no Firebase.';
-  if(c==='permission-denied'||c==='firestore/permission-denied') return 'Sem permissão no Firestore. Verifique as regras de segurança.';
-  return (e&&e.message)||'Erro inesperado.';
+  const mensagens={
+    'auth/email-already-in-use':'Este e-mail já tem uma conta. Faça login ou redefina sua senha.',
+    'auth/invalid-email':'Digite um e-mail válido, como nome@exemplo.com.',
+    'auth/weak-password':'A senha precisa ter pelo menos 6 caracteres.',
+    'auth/user-not-found':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
+    'auth/wrong-password':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
+    'auth/invalid-credential':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
+    'auth/invalid-login-credentials':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
+    'auth/user-disabled':'Este acesso foi desativado. Entre em contato com a TJ Refrigeração.',
+    'auth/too-many-requests':'Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.',
+    'auth/network-request-failed':'Não foi possível conectar. Confira sua internet e tente novamente.',
+    'auth/operation-not-allowed':'O acesso está indisponível no momento. Entre em contato com a TJ Refrigeração.',
+    'auth/requires-recent-login':'Por segurança, saia e entre novamente antes de continuar.',
+    'auth/user-token-expired':'Sua sessão expirou. Entre novamente.',
+    'auth/invalid-user-token':'Sua sessão expirou. Entre novamente.',
+    'permission-denied':'Não foi possível acessar os dados desta conta. Entre em contato com a TJ Refrigeração.',
+    'firestore/permission-denied':'Não foi possível acessar os dados desta conta. Entre em contato com a TJ Refrigeração.',
+    'unavailable':'O serviço está temporariamente indisponível. Tente novamente em alguns instantes.'
+  };
+  return mensagens[c]||'Não foi possível concluir esta ação. Tente novamente. Se continuar, entre em contato com a TJ Refrigeração.';
 }
+function mensagemAcesso(msg,empresa){
+  const id=empresa?'tj-login-empresa-erro':'tj-login-erro';
+  let el=document.getElementById(id);
+  if(!el){
+    const btn=document.querySelector('[data-action="'+(empresa?'entrar-empresa':'entrar-cliente')+'"]');
+    if(!btn)return;
+    el=document.createElement('p');el.id=id;el.setAttribute('role','alert');el.setAttribute('aria-live','assertive');
+    el.style.cssText='color:#ffd9d9;background:#592c37;border:1px solid #c87180;border-radius:12px;padding:12px;margin:12px 0;line-height:1.5;';
+    btn.before(el);
+  }
+  el.textContent=msg||'';el.hidden=!msg;
+}
+function limparAcesso(){
+  ['login-email','login-senha','email-empresa-input','senha-empresa-input','cad-senha','cad-senha2'].forEach(id=>{
+    const campo=document.getElementById(id);if(!campo)return;campo.value='';
+    if(id.includes('senha'))campo.type='password';
+    const btn=document.querySelector('.tj-password-toggle[data-id="'+id+'"]');
+    if(btn){btn.setAttribute('aria-label','Mostrar senha');btn.setAttribute('aria-pressed','false');const slash=btn.querySelector('.tj-password-slash');if(slash)slash.style.display='none';}
+  });
+  mensagemAcesso('',false);mensagemAcesso('',true);
+}
+window.TJLimparAcesso=limparAcesso;
+window.addEventListener('pagehide',limparAcesso);
+window.addEventListener('pageshow',e=>{if(e.persisted)limparAcesso();});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden&&!document.getElementById('auth-container').classList.contains('hidden'))limparAcesso();
+});
+document.addEventListener('input',e=>{
+  if(['login-email','login-senha'].includes(e.target.id))mensagemAcesso('',false);
+  if(['email-empresa-input','senha-empresa-input'].includes(e.target.id))mensagemAcesso('',true);
+});
 function guardaSessao(user,tipo){
   try{ localStorage.setItem('tj_sessao',JSON.stringify({uid:user.uid,email:user.email||'',tipo:tipo||'cliente'})); }catch(e){}
 }
@@ -6958,6 +7002,7 @@ function limpaSessao(){
   try{ localStorage.removeItem('tj_sessao'); }catch(e){}
 }
 function telaLogin(){
+  limparAcesso();
   document.getElementById('auth-container').classList.remove('hidden');
   document.getElementById('painel-principal').classList.add('hidden');
   document.getElementById('tela-empresa-senha').classList.add('hidden');
@@ -6993,6 +7038,7 @@ function atualizarIdentidadeEmpresa(perfil){
 }
 
 function telaApp(tipo){
+  limparAcesso();
   state.perfilSessao=tipo;
   if(tipo==='cliente') atualizarIdentidadeCliente(window.TJFB&&window.TJFB.perfilCliente||{});
   else atualizarIdentidadeEmpresa(window.TJFB&&window.TJFB.perfilEmpresa||{});
@@ -7493,14 +7539,16 @@ async function cadastrarClientePeloProprietario(){
 window.TJFB.cadastrarClientePeloProprietario=cadastrarClientePeloProprietario;
 
 async function fazerLoginCliente(email,senha){
-  if(!email||!senha){ aviso('Preencha e-mail e senha.'); return; }
+  if(!email||!senha){ mensagemAcesso('Preencha e-mail e senha.',false); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){mensagemAcesso(msgErro({code:'auth/invalid-email'}),false);return;}
+  mensagemAcesso('',false);
   try{
     try{ localStorage.removeItem('tj_login_intencao'); }catch(e){}
     const cred=await auth.signInWithEmailAndPassword(email,senha);
     const perfil=await carregarPerfil(cred.user);
     if(perfil && perfil.active===false){
       await auth.signOut();
-      aviso('Este acesso foi desativado pela TJ Refrigeração.');
+      mensagemAcesso('Este acesso foi desativado pela TJ Refrigeração.',false);
       return;
     }
 
@@ -7521,18 +7569,20 @@ async function fazerLoginCliente(email,senha){
     await carregarDadosCliente(cred.user,perfil);
     telaApp('cliente');
     aviso('Login realizado com sucesso.');
-  }catch(e){ console.error('[TJFB] login',e); aviso(msgErro(e)); }
+  }catch(e){ console.error('[TJFB] login',e); mensagemAcesso(msgErro(e),false); }
 }
 
 async function fazerLoginEmpresa(email,senha){
-  if(!email||!senha){ aviso('Informe o e-mail e a senha do proprietário.'); return; }
+  if(!email||!senha){ mensagemAcesso('Informe o e-mail e a senha do proprietário.',true); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){mensagemAcesso(msgErro({code:'auth/invalid-email'}),true);return;}
+  mensagemAcesso('',true);
   try{
     try{ localStorage.setItem('tj_login_intencao','empresa'); }catch(e){}
     const cred=await auth.signInWithEmailAndPassword(email,senha);
     const perfil=await carregarPerfil(cred.user);
     if(perfil.role!=='owner'){
       await auth.signOut();
-      aviso('Esta conta não possui permissão de proprietário.');
+      mensagemAcesso('Esta conta não possui permissão de proprietário.',true);
       return;
     }
     window.TJFB.perfilEmpresa=perfil;
@@ -7540,14 +7590,14 @@ async function fazerLoginEmpresa(email,senha){
     telaApp('empresa');
     try{ localStorage.removeItem('tj_login_intencao'); }catch(e){}
     aviso('Acesso do proprietário autorizado.');
-  }catch(e){ console.error('[TJFB] login empresa',e); aviso(msgErro(e)); }
+  }catch(e){ console.error('[TJFB] login empresa',e); mensagemAcesso(msgErro(e),true); }
 }
 
 async function recuperarSenha(){
   const email=(document.getElementById('login-email')?.value||'').trim();
-  if(!email){ aviso('Digite seu e-mail no campo de login primeiro.'); return; }
-  try{ await auth.sendPasswordResetEmail(email); aviso('Enviamos o link de redefinição para o seu e-mail.'); }
-  catch(e){ aviso(msgErro(e)); }
+  if(!email){ mensagemAcesso('Digite seu e-mail no campo de login primeiro.',false); return; }
+  try{ await auth.sendPasswordResetEmail(email); mensagemAcesso('Se houver uma conta com este e-mail, você receberá as instruções para redefinir a senha.',false); }
+  catch(e){ mensagemAcesso(msgErro(e),false); }
 }
 window.TJFB.recoverPassword=recuperarSenha;
 window.TJFB.alterarSenha=async function(novaSenha){
@@ -7570,11 +7620,11 @@ document.addEventListener('click',function(ev){
   }
   if(acao==='entrar-cliente'){
     ev.preventDefault(); ev.stopImmediatePropagation();
-    fazerLoginCliente((document.getElementById('login-email')?.value||'').trim(),(document.getElementById('login-senha')?.value||'').trim()); return;
+    fazerLoginCliente((document.getElementById('login-email')?.value||'').trim(),(document.getElementById('login-senha')?.value||'')); return;
   }
   if(acao==='entrar-empresa'){
     ev.preventDefault(); ev.stopImmediatePropagation();
-    fazerLoginEmpresa((document.getElementById('email-empresa-input')?.value||'').trim(),(document.getElementById('senha-empresa-input')?.value||'').trim()); return;
+    fazerLoginEmpresa((document.getElementById('email-empresa-input')?.value||'').trim(),(document.getElementById('senha-empresa-input')?.value||'')); return;
   }
   if(acao==='esqueci-senha'){
     ev.preventDefault(); ev.stopImmediatePropagation(); recuperarSenha(); return;
