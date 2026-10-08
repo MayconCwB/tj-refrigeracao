@@ -952,7 +952,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
           
           <div class="form-group">
             <label class="form-label">Telefone</label>
-            <input type="text" id="cad-tel" class="form-input" placeholder="(00) 00000-0000" maxlength="15">
+            <input type="tel" id="cad-tel" inputmode="tel" autocomplete="tel" class="form-input" placeholder="(00) 00000-0000" maxlength="15">
             <div id="err-cad-tel" class="form-error">Telefone inválido.</div>
           </div>
           
@@ -968,7 +968,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
               <input type="password" id="cad-senha" class="form-input" placeholder="Crie uma senha segura" minlength="8" aria-describedby="err-cad-senha">
               <button type="button" class="tj-password-toggle" data-action="toggle-pwd" data-id="cad-senha" aria-controls="cad-senha" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="tj-password-slash" d="m3 3 18 18" style="display:none"/></svg></button>
             </div>
-            <div id="err-cad-senha" class="form-error" style="display:block;color:var(--text-muted);line-height:1.5">Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um caractere especial (como !, @ ou #).</div>
+            <div id="err-cad-senha" class="form-error" style="display:block;color:var(--text-muted);line-height:1.5">Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula e um caractere especial (como !, @ ou #).</div>
           </div>
           
           <div class="form-group">
@@ -2512,7 +2512,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="cfg-senha-nova">Nova senha</label>
-                <input type="password" id="cfg-senha-nova" class="form-input" placeholder="Deixe em branco para manter" minlength="8" aria-describedby="tj-senha-regras-config"><p id="tj-senha-regras-config" style="color:var(--text-muted);line-height:1.5;font-size:14px">Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um caractere especial (como !, @ ou #).</p>
+                <input type="password" id="cfg-senha-nova" class="form-input" placeholder="Deixe em branco para manter" minlength="8" aria-describedby="tj-senha-regras-config"><p id="tj-senha-regras-config" style="color:var(--text-muted);line-height:1.5;font-size:14px">Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula e um caractere especial (como !, @ ou #).</p>
               </div>
               <div class="form-group">
                 <label class="form-label" for="cfg-senha-conf">Confirmar nova senha</label>
@@ -6946,7 +6946,7 @@ function msgErro(e){
   const mensagens={
     'auth/email-already-in-use':'Este e-mail já tem uma conta. Faça login ou redefina sua senha.',
     'auth/invalid-email':'Digite um e-mail válido, como nome@exemplo.com.',
-    'auth/weak-password':'Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um caractere especial (como !, @ ou #).',
+    'auth/weak-password':'Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula e um caractere especial (como !, @ ou #).',
     'auth/user-not-found':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
     'auth/wrong-password':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
     'auth/invalid-credential':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
@@ -6964,8 +6964,31 @@ function msgErro(e){
   };
   return mensagens[c]||'Não foi possível concluir esta ação. Tente novamente. Se continuar, entre em contato com a TJ Refrigeração.';
 }
-window.TJSenhaRequisitos='Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um caractere especial (como !, @ ou #).';
-window.TJSenhaValida=function(senha){return typeof senha==='string'&&senha.length>=8&&/[A-Z]/.test(senha)&&/[a-z]/.test(senha)&&/[0-9]/.test(senha)&&/[^A-Za-z0-9\s]/.test(senha);};
+window.TJSenhaRequisitos='Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula e um caractere especial (como !, @ ou #).';
+window.TJSenhaValida=function(senha){return typeof senha==='string'&&senha.length>=8&&/[A-Z]/.test(senha)&&/[a-z]/.test(senha)&&/[^A-Za-z0-9\s]/.test(senha);};
+window.TJTelefoneValido=function(valor){
+  if(typeof valor!=='string'||!/^[+()\d\s.-]+$/.test(valor))return false;
+  let n=valor.replace(/\D/g,'');if(n.length===12||n.length===13){if(!n.startsWith('55'))return false;n=n.slice(2);}
+  const ddds='11 12 13 14 15 16 17 18 19 21 22 24 27 28 31 32 33 34 35 37 38 41 42 43 44 45 46 47 48 49 51 53 54 55 61 62 63 64 65 66 67 68 69 71 73 74 75 77 79 81 82 83 84 85 86 87 88 89 91 92 93 94 95 96 97 98 99'.split(' ');
+  return ddds.includes(n.slice(0,2))&&(/^[2-5]\d{7}$/.test(n.slice(2))||/^9\d{8}$/.test(n.slice(2)));
+};
+window.TJTelefoneMensagem='Informe um telefone brasileiro completo com DDD, como (41) 99999-1234 ou (41) 3333-1234.';
+function validarCampoTelefone(campo){
+  if(!campo)return true;const valido=window.TJTelefoneValido(campo.value);
+  const id='tj-telefone-erro-'+campo.id;let erro=document.getElementById(id);
+  if(!erro){erro=document.createElement('p');erro.id=id;erro.setAttribute('role','alert');erro.style.cssText='color:var(--danger,#b91c1c);font-size:14px;line-height:1.5;margin-top:6px';campo.after(erro);}
+  erro.textContent=valido?'':window.TJTelefoneMensagem;erro.hidden=valido;campo.setAttribute('aria-invalid',String(!valido));campo.setCustomValidity(valido?'':window.TJTelefoneMensagem);return valido;
+}
+document.addEventListener('click',function(e){
+  const b=e.target.closest&&e.target.closest('[data-action]');if(!b)return;
+  const acao=b.dataset.action;let id='';
+  if(acao==='concluir-cadastro')id='cad-tel';
+  if(acao==='salvar-cliente-empresa')id='emp-cli-tel';
+  if(['salvar-contato','salvar-contato-cli'].includes(acao))id='contato-cli-tel';
+  if(['salvar-perfil','salvar-dados-cli'].includes(acao)&&state.perfilSessao==='cliente')id='cli-perfil-tel';
+  if(id&&!validarCampoTelefone(document.getElementById(id))){e.preventDefault();e.stopImmediatePropagation();document.getElementById(id).focus();}
+},true);
+document.addEventListener('input',function(e){if(['cad-tel','emp-cli-tel','cli-perfil-tel','contato-cli-tel'].includes(e.target.id)){e.target.setCustomValidity('');e.target.removeAttribute('aria-invalid');const erro=document.getElementById('tj-telefone-erro-'+e.target.id);if(erro)erro.hidden=true;}},true);
 function emailValido(email){
   if(typeof email!=='string'||email.length>254||email.includes('..'))return false;
   const partes=email.split('@');
@@ -7448,6 +7471,7 @@ async function fazerCadastro(){
   const email=(document.getElementById('cad-email')?.value||'').trim();
   const senha=document.getElementById('cad-senha')?.value||'';
   const senha2=document.getElementById('cad-senha2')?.value||'';
+  if(!window.TJTelefoneValido(telefone)){validarCampoTelefone(document.getElementById('cad-tel'));return;}
   if(!nome||!telefone||!email||!senha||!senha2){ aviso('Preencha todos os campos obrigatórios.'); return; }
   if(!emailValido(email)){ aviso('Informe um e-mail válido.'); return; }
   if(!window.TJSenhaValida(senha)){ aviso(window.TJSenhaRequisitos); return; }
@@ -7485,6 +7509,7 @@ async function cadastrarClientePeloProprietario(){
   const email=(document.getElementById('emp-cli-email')?.value||'').trim().toLowerCase();
   const btn=document.getElementById('btn-salvar-cliente-empresa');
 
+  if(!window.TJTelefoneValido(telefone)){validarCampoTelefone(document.getElementById('emp-cli-tel'));return;}
   if(!nome||!telefone||!email){ aviso('Preencha nome, telefone e e-mail.'); return; }
   if(!emailValido(email)){ aviso('Informe um e-mail válido.'); return; }
 
@@ -7930,7 +7955,7 @@ function renderClientesAdmin(){
 }
 renderizarClientesEmpresa=async function(){await carregarClientesEmpresaFirebase();renderClientesAdmin();};
 function abrirEditarCliente(uid){var c=clientePorUid(uid);if(!c)return;$v('emp-cli-uid').value=uid;$v('emp-cli-form-titulo').textContent='Editar Cliente';$v('emp-cli-form-subtitulo').textContent='Altere os dados cadastrais do cliente. O e-mail de acesso não é alterado por segurança.';$v('emp-cli-tipo').value=c.tipo;$v('emp-cli-nome').value=c.nome;$v('emp-cli-tel').value=c.tel==='Não informado'?'':c.tel;$v('emp-cli-email').value=c.email;$v('emp-cli-email').readOnly=true;$v('btn-salvar-cliente-empresa').textContent='SALVAR ALTERAÇÕES';abrirTela('tela-emp-novo-cliente');}
-async function salvarEdicaoCliente(){var uid=$v('emp-cli-uid').value;if(!uid)return false;var tipo=$v('emp-cli-tipo').value,nome=$v('emp-cli-nome').value.trim(),tel=$v('emp-cli-tel').value.trim();if(!nome||!tel){avisoV13('Preencha nome e telefone.');return true;}await Promise.all([window.TJFB.db.collection('clients').doc(uid).set({nome:nome,telefone:tel,tipoPessoa:tipo,atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),window.TJFB.db.collection('users').doc(uid).set({nome:nome,tipoPessoa:tipo,atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})]);await recarregarV13();avisoV13('Cliente atualizado.');abrirTela('tela-emp-clientes');return true;}
+async function salvarEdicaoCliente(){var uid=$v('emp-cli-uid').value;if(!uid)return false;var tipo=$v('emp-cli-tipo').value,nome=$v('emp-cli-nome').value.trim(),tel=$v('emp-cli-tel').value.trim();if(!nome||!tel){avisoV13('Preencha nome e telefone.');return true;}if(!window.TJTelefoneValido(tel)){avisoV13(window.TJTelefoneMensagem);return true;}await Promise.all([window.TJFB.db.collection('clients').doc(uid).set({nome:nome,telefone:tel,tipoPessoa:tipo,atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),window.TJFB.db.collection('users').doc(uid).set({nome:nome,tipoPessoa:tipo,atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})]);await recarregarV13();avisoV13('Cliente atualizado.');abrirTela('tela-emp-clientes');return true;}
 async function excluirClienteAdmin(uid){
   if(!ownerOk())return avisoV13('Acesso restrito ao proprietário.');
   var c=clientePorUid(uid);
