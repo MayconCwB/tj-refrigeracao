@@ -1052,6 +1052,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
             </span>
             <span class="drawer-card-arrow">→</span>
           </button>
+<button type="button" class="drawer-card" data-action="nav-tela" data-id="tela-cli-config"><span class="drawer-card-icon">⚙️</span><span class="drawer-card-content"><span class="drawer-card-title">Configurações</span><span class="drawer-card-desc">Tema e segurança da conta</span></span><span class="drawer-card-arrow">→</span></button>
           <button type="button" class="drawer-card pwa-install-trigger">
             <span class="drawer-card-icon">📲</span>
             <span class="drawer-card-content">
@@ -1538,19 +1539,6 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
             <button type="button" class="btn-tj" data-action="salvar-dados-cli">Salvar Dados Cadastrais</button>
           </div>
 
-          <div class="card-box">
-            <div class="card-title">Aparência</div>
-            <p class="card-subtitle">Escolha como o portal deve aparecer neste aparelho.</p>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" for="cfg-tema-cli">Tema</label>
-              <select id="cfg-tema-cli" class="form-select" data-tj-theme-select>
-                <option value="system">📱 Usar tema do sistema</option>
-                <option value="light">☀️ Claro</option>
-                <option value="dark">🌙 Escuro</option>
-              </select>
-            </div>
-          </div>
-
           <!-- CONTATOS DO CLIENTE -->
           <div class="card-box">
             <div class="card-title">
@@ -1574,6 +1562,20 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
           </div>
         </section>
 
+<section id="tela-cli-config" class="hidden"><button type="button" class="btn-voltar" data-action="voltar">‹ Voltar</button>          <div class="card-box">
+            <div class="card-title">Aparência</div>
+            <p class="card-subtitle">Escolha como o portal deve aparecer neste aparelho.</p>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" for="cfg-tema-cli">Tema</label>
+              <select id="cfg-tema-cli" class="form-select" data-tj-theme-select>
+                <option value="system">📱 Usar tema do sistema</option>
+                <option value="light">☀️ Claro</option>
+                <option value="dark">🌙 Escuro</option>
+              </select>
+            </div>
+          </div>
+
+<div class="card-box"><div class="card-title">Segurança</div><p class="card-subtitle">Altere a senha de acesso à sua conta.</p><p id="cli-cfg-senha-regras" class="card-subtitle">Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula e um caractere especial (como !, @ ou #).</p><div class="form-group"><label class="form-label" for="cli-cfg-senha-atual">Senha atual</label><div style="position:relative"><input id="cli-cfg-senha-atual" type="password" class="form-input" autocomplete="current-password" style="padding-right:52px" aria-describedby="cli-cfg-senha-regras"><button type="button" class="tj-password-toggle" data-action="toggle-pwd" data-id="cli-cfg-senha-atual" aria-controls="cli-cfg-senha-atual" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="tj-password-slash" d="m3 3 18 18" style="display:none"/></svg></button></div></div><div class="form-group"><label class="form-label" for="cli-cfg-senha-nova">Nova senha</label><div style="position:relative"><input id="cli-cfg-senha-nova" type="password" class="form-input" autocomplete="new-password" style="padding-right:52px" aria-describedby="cli-cfg-senha-regras"><button type="button" class="tj-password-toggle" data-action="toggle-pwd" data-id="cli-cfg-senha-nova" aria-controls="cli-cfg-senha-nova" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="tj-password-slash" d="m3 3 18 18" style="display:none"/></svg></button></div></div><div class="form-group"><label class="form-label" for="cli-cfg-senha-conf">Confirmar nova senha</label><div style="position:relative"><input id="cli-cfg-senha-conf" type="password" class="form-input" autocomplete="new-password" style="padding-right:52px" aria-describedby="cli-cfg-senha-regras"><button type="button" class="tj-password-toggle" data-action="toggle-pwd" data-id="cli-cfg-senha-conf" aria-controls="cli-cfg-senha-conf" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="tj-password-slash" d="m3 3 18 18" style="display:none"/></svg></button></div></div><p id="cli-cfg-feedback" role="status" aria-live="polite" style="line-height:1.5"></p><button type="button" class="btn-tj" data-action="alterar-senha-cli">Alterar senha</button></div></section>
         <!-- FORM CONTATO CLIENTE (TELA PRÓPRIA ESTILO PASTAS) -->
         <section id="tela-form-contato-cli" class="hidden">
           <button type="button" class="btn-voltar" data-action="voltar">‹ Voltar</button>
@@ -2919,6 +2921,8 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
           atualizarBreadcrumb([{label: "Orçamentos", action: "nav-tela", id: "tela-emp-orcamentos"}, {label: "#" + orcamentoAtualNum}]);
         }
         renderizarDetalheOrcamento();
+      } else if (idTela === "tela-cli-config") {
+        atualizarBreadcrumb([{label: "Configurações"}]);
       } else if (idTela === "tela-cli-perfil") {
         atualizarBreadcrumb([{label: "Perfil"}]);
         renderizarPerfilCliente();
@@ -6361,6 +6365,34 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 })();
 </script>
 
+<script>
+(function(){
+let ocupado=false;
+const ids=['cli-cfg-senha-atual','cli-cfg-senha-nova','cli-cfg-senha-conf'];
+function limpar(){ids.forEach(id=>{const campo=document.getElementById(id);campo.value='';campo.type='password';const btn=document.querySelector('[data-id="'+id+'"].tj-password-toggle');btn.setAttribute('aria-pressed','false');btn.setAttribute('aria-label','Mostrar senha');btn.querySelector('.tj-password-slash').style.display='none';});}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)limpar();});
+window.addEventListener('pagehide',limpar);
+document.addEventListener('click',async function(e){
+const btn=e.target.closest&&e.target.closest('[data-action="alterar-senha-cli"]');if(!btn)return;
+e.preventDefault();e.stopImmediatePropagation();if(ocupado)return;
+const msg=document.getElementById('cli-cfg-feedback');const user=window.TJFB&&TJFB.auth.currentUser;
+const atual=document.getElementById(ids[0]).value,nova=document.getElementById(ids[1]).value,conf=document.getElementById(ids[2]).value;
+function avisar(texto,erro){msg.textContent=texto;msg.setAttribute('role',erro?'alert':'status');}
+if(!user||state.perfilSessao!=='cliente'){avisar('Sua sessão expirou. Entre novamente.',true);return;}
+if(!atual){avisar('Informe sua senha atual.',true);return;}
+if(!window.TJSenhaValida(nova)){avisar(window.TJSenhaRequisitos,true);return;}
+if(nova!==conf){avisar('As senhas não conferem.',true);return;}
+ocupado=true;btn.disabled=true;btn.textContent='Alterando senha…';avisar('',false);
+try{
+const credential=firebase.auth.EmailAuthProvider.credential(user.email,atual);
+await user.reauthenticateWithCredential(credential);
+if(TJFB.auth.currentUser?.uid!==user.uid||state.perfilSessao!=='cliente')throw {code:'auth/user-token-expired'};
+await TJFB.alterarSenha(nova);limpar();avisar('Senha alterada com sucesso.',false);
+}catch(erro){const code=erro.code||'';avisar(['auth/wrong-password','auth/invalid-credential','auth/invalid-login-credentials'].includes(code)?'Senha atual incorreta. Confira e tente novamente.':code==='auth/network-request-failed'?'Não foi possível conectar. Confira sua internet e tente novamente.':code==='auth/too-many-requests'?'Muitas tentativas. Aguarde alguns minutos e tente novamente.':'Não foi possível alterar a senha. Entre novamente e tente mais uma vez.',true);
+}finally{ocupado=false;btn.disabled=false;btn.textContent='Alterar senha';}
+},true);
+})();
+</script>
 </body>
 
 <!-- ===== AJUSTES TJ: ETAPA 8 (trilha de status) + ETAPA 9 (decisões e itens do orçamento) ===== -->
@@ -7009,7 +7041,7 @@ function mensagemAcesso(msg,empresa){
   el.textContent=msg||'';el.hidden=!msg;
 }
 function limparAcesso(){
-  ['login-email','login-senha','email-empresa-input','senha-empresa-input','cad-senha','cad-senha2'].forEach(id=>{
+  ['login-email','login-senha','email-empresa-input','senha-empresa-input','cad-senha','cad-senha2','cli-cfg-senha-atual','cli-cfg-senha-nova','cli-cfg-senha-conf'].forEach(id=>{
     const campo=document.getElementById(id);if(!campo)return;campo.value='';
     if(id.includes('senha'))campo.type='password';
     const btn=document.querySelector('.tj-password-toggle[data-id="'+id+'"]');
@@ -8142,7 +8174,7 @@ document.addEventListener('change',function(ev){
 var abrirTelaV23=abrirTela;
 abrirTela=function(idTela,registrarHistorico){
   var r=abrirTelaV23(idTela,registrarHistorico);
-  if((idTela==='tela-cli-perfil'||idTela==='tela-emp-config')&&window.TJTheme){
+  if((idTela==='tela-cli-config'||idTela==='tela-emp-config')&&window.TJTheme){
     var modo=window.TJTheme.getMode(), sels=document.querySelectorAll('[data-tj-theme-select]');
     for(var i=0;i<sels.length;i++) sels[i].value=modo;
   }
