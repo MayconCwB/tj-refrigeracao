@@ -965,10 +965,10 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
           <div class="form-group">
             <label class="form-label">Senha (mínimo 6 caracteres)</label>
             <div style="position: relative;">
-              <input type="password" id="cad-senha" class="form-input" placeholder="Mínimo 6 dígitos">
+              <input type="password" id="cad-senha" class="form-input" placeholder="Crie uma senha segura" minlength="8" aria-describedby="err-cad-senha">
               <button type="button" class="tj-password-toggle" data-action="toggle-pwd" data-id="cad-senha" aria-controls="cad-senha" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="tj-password-slash" d="m3 3 18 18" style="display:none"/></svg></button>
             </div>
-            <div id="err-cad-senha" class="form-error">Senha deve ter no mínimo 6 caracteres.</div>
+            <div id="err-cad-senha" class="form-error" style="display:block;color:var(--text-muted);line-height:1.5">Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um caractere especial (como !, @ ou #).</div>
           </div>
           
           <div class="form-group">
@@ -2512,7 +2512,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="cfg-senha-nova">Nova senha</label>
-                <input type="password" id="cfg-senha-nova" class="form-input" placeholder="Deixe em branco para manter">
+                <input type="password" id="cfg-senha-nova" class="form-input" placeholder="Deixe em branco para manter" minlength="8" aria-describedby="tj-senha-regras-config"><p id="tj-senha-regras-config" style="color:var(--text-muted);line-height:1.5;font-size:14px">Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um caractere especial (como !, @ ou #).</p>
               </div>
               <div class="form-group">
                 <label class="form-label" for="cfg-senha-conf">Confirmar nova senha</label>
@@ -6048,12 +6048,12 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 
         var sN = document.getElementById("cfg-senha-nova");
         var sC = document.getElementById("cfg-senha-conf");
-        var vN = sN ? sN.value.trim() : "";
-        var vC = sC ? sC.value.trim() : "";
+        var vN = sN ? sN.value : "";
+        var vC = sC ? sC.value : "";
 
         if (vN !== "" || vC !== "") {
           if (vN !== vC) { toast("As senhas não conferem!"); return; }
-          if (vN.length < 6) { toast("A nova senha precisa ter pelo menos 6 caracteres."); return; }
+          if (!window.TJSenhaValida(vN)) { toast(window.TJSenhaRequisitos); return; }
           if (window.TJFB && window.TJFB.alterarSenha) {
             window.TJFB.alterarSenha(vN).then(function(){
               if (sN) sN.value = "";
@@ -6946,7 +6946,7 @@ function msgErro(e){
   const mensagens={
     'auth/email-already-in-use':'Este e-mail já tem uma conta. Faça login ou redefina sua senha.',
     'auth/invalid-email':'Digite um e-mail válido, como nome@exemplo.com.',
-    'auth/weak-password':'A senha precisa ter pelo menos 6 caracteres.',
+    'auth/weak-password':'Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um caractere especial (como !, @ ou #).',
     'auth/user-not-found':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
     'auth/wrong-password':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
     'auth/invalid-credential':'E-mail ou senha inválidos. Confira os dados ou use “Esqueci minha senha”.',
@@ -6964,6 +6964,8 @@ function msgErro(e){
   };
   return mensagens[c]||'Não foi possível concluir esta ação. Tente novamente. Se continuar, entre em contato com a TJ Refrigeração.';
 }
+window.TJSenhaRequisitos='Use pelo menos 8 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um caractere especial (como !, @ ou #).';
+window.TJSenhaValida=function(senha){return typeof senha==='string'&&senha.length>=8&&/[A-Z]/.test(senha)&&/[a-z]/.test(senha)&&/[0-9]/.test(senha)&&/[^A-Za-z0-9\s]/.test(senha);};
 function emailValido(email){
   if(typeof email!=='string'||email.length>254||email.includes('..'))return false;
   const partes=email.split('@');
@@ -7448,7 +7450,7 @@ async function fazerCadastro(){
   const senha2=document.getElementById('cad-senha2')?.value||'';
   if(!nome||!telefone||!email||!senha||!senha2){ aviso('Preencha todos os campos obrigatórios.'); return; }
   if(!emailValido(email)){ aviso('Informe um e-mail válido.'); return; }
-  if(senha.length<6){ aviso('A senha precisa ter pelo menos 6 caracteres.'); return; }
+  if(!window.TJSenhaValida(senha)){ aviso(window.TJSenhaRequisitos); return; }
   if(senha!==senha2){ aviso('As senhas não conferem.'); return; }
   try{
     cadastroEmAndamento=true;
@@ -7609,6 +7611,7 @@ async function recuperarSenha(){
 }
 window.TJFB.recoverPassword=recuperarSenha;
 window.TJFB.alterarSenha=async function(novaSenha){
+  if(!window.TJSenhaValida(novaSenha))throw new Error(window.TJSenhaRequisitos);
   const user=auth.currentUser;
   if(!user) throw new Error('Sessão expirada. Faça login novamente.');
   await user.updatePassword(novaSenha);
