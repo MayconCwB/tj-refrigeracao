@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tj-refrigeracao-pwa-v69-relatorios';
+const CACHE_NAME = 'tj-refrigeracao-pwa-v70-acesso-direto';
 const APP_SHELL = [
   './index.html',
   './assets/tj-core.js',
