@@ -6964,6 +6964,13 @@ function msgErro(e){
   };
   return mensagens[c]||'Não foi possível concluir esta ação. Tente novamente. Se continuar, entre em contato com a TJ Refrigeração.';
 }
+function emailValido(email){
+  if(typeof email!=='string'||email.length>254||email.includes('..'))return false;
+  const partes=email.split('@');
+  if(partes.length!==2||!partes[0]||partes[0].length>64||partes[0].startsWith('.')||partes[0].endsWith('.'))return false;
+  return /^[A-Za-z0-9.!#$%&'*+\/=?^_`{|}~-]+$/.test(partes[0])&&/^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/.test(partes[1]);
+}
+window.TJEmailValido=emailValido;
 function mensagemAcesso(msg,empresa){
   const id=empresa?'tj-login-empresa-erro':'tj-login-erro';
   let el=document.getElementById(id);
@@ -7440,7 +7447,7 @@ async function fazerCadastro(){
   const senha=document.getElementById('cad-senha')?.value||'';
   const senha2=document.getElementById('cad-senha2')?.value||'';
   if(!nome||!telefone||!email||!senha||!senha2){ aviso('Preencha todos os campos obrigatórios.'); return; }
-  if(!email.includes('@')){ aviso('Informe um e-mail válido.'); return; }
+  if(!emailValido(email)){ aviso('Informe um e-mail válido.'); return; }
   if(senha.length<6){ aviso('A senha precisa ter pelo menos 6 caracteres.'); return; }
   if(senha!==senha2){ aviso('As senhas não conferem.'); return; }
   try{
@@ -7477,7 +7484,7 @@ async function cadastrarClientePeloProprietario(){
   const btn=document.getElementById('btn-salvar-cliente-empresa');
 
   if(!nome||!telefone||!email){ aviso('Preencha nome, telefone e e-mail.'); return; }
-  if(!email.includes('@')){ aviso('Informe um e-mail válido.'); return; }
+  if(!emailValido(email)){ aviso('Informe um e-mail válido.'); return; }
 
   var appSec=null;
   try{
@@ -7540,7 +7547,7 @@ window.TJFB.cadastrarClientePeloProprietario=cadastrarClientePeloProprietario;
 
 async function fazerLoginCliente(email,senha){
   if(!email||!senha){ mensagemAcesso('Preencha e-mail e senha.',false); return; }
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){mensagemAcesso(msgErro({code:'auth/invalid-email'}),false);return;}
+  if(!emailValido(email)){mensagemAcesso(msgErro({code:'auth/invalid-email'}),false);return;}
   mensagemAcesso('',false);
   try{
     try{ localStorage.removeItem('tj_login_intencao'); }catch(e){}
@@ -7574,7 +7581,7 @@ async function fazerLoginCliente(email,senha){
 
 async function fazerLoginEmpresa(email,senha){
   if(!email||!senha){ mensagemAcesso('Informe o e-mail e a senha do proprietário.',true); return; }
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){mensagemAcesso(msgErro({code:'auth/invalid-email'}),true);return;}
+  if(!emailValido(email)){mensagemAcesso(msgErro({code:'auth/invalid-email'}),true);return;}
   mensagemAcesso('',true);
   try{
     try{ localStorage.setItem('tj_login_intencao','empresa'); }catch(e){}
@@ -7596,6 +7603,7 @@ async function fazerLoginEmpresa(email,senha){
 async function recuperarSenha(){
   const email=(document.getElementById('login-email')?.value||'').trim();
   if(!email){ mensagemAcesso('Digite seu e-mail no campo de login primeiro.',false); return; }
+  if(!emailValido(email)){mensagemAcesso(msgErro({code:'auth/invalid-email'}),false);return;}
   try{ await auth.sendPasswordResetEmail(email); mensagemAcesso('Se houver uma conta com este e-mail, você receberá as instruções para redefinir a senha.',false); }
   catch(e){ mensagemAcesso(msgErro(e),false); }
 }
