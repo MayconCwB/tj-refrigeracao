@@ -753,6 +753,11 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
 /* Impressão profissional */
 #tj-print-root{display:none}
 @media print{
+  html,body{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;display:block!important;position:static!important}
+  #tj-print-root{height:auto!important;max-height:none!important;overflow:visible!important}
+  #tj-print-root table{overflow:visible!important;white-space:normal!important}
+  #tj-print-root td,#tj-print-root th{overflow-wrap:anywhere!important;white-space:pre-wrap}
+  #tj-print-root thead{display:table-header-group}
   @page{size:A4;margin:12mm}
   body>*:not(#tj-print-root){display:none!important}
   #tj-print-root{display:block!important;position:static!important;width:100%!important;background:#fff!important;color:#17202A!important;font-family:Arial,Helvetica,sans-serif!important}
