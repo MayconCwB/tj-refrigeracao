@@ -1,15 +1,63 @@
-/* Temporary project suspension: replaces previously cached application screens. */
-const maintenance="<!doctype html>\n<html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta name=\"theme-color\" content=\"#0d2b43\"><title>TJ Refrigeração — Acesso temporariamente suspenso</title>\n<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#071923;color:#eaf5fc;font-family:Arial,sans-serif}main{width:min(100%,540px);padding:36px 28px;border:1px solid #294d62;border-top:4px solid #83dafa;border-radius:20px;background:#0d2b43;box-shadow:0 20px 70px #0003}header{font-size:14px;font-weight:700;letter-spacing:2px;color:#8edcf5;margin-bottom:32px}h1{font-size:clamp(26px,6vw,36px);line-height:1.2;margin:0 0 20px}p{font-size:17px;line-height:1.7;color:#bbd0de;margin:0 0 16px}.status{display:inline-block;border:1px solid #416478;border-radius:30px;padding:9px 14px;font-size:13px;color:#d9ecf8;margin-bottom:24px}footer{border-top:1px solid #294d62;padding-top:20px;margin-top:28px;font-size:13px;color:#96b4c8}</style></head>\n<body><main><header>TJ REFRIGERAÇÃO</header><span class=\"status\">ACESSO TEMPORARIAMENTE SUSPENSO</span><h1>Uma pausa por aqui.</h1><p>O site e o aplicativo estão temporariamente indisponíveis.</p><p>As atividades deste projeto foram pausadas, com retomada prevista para 2027. Agradecemos pela compreensão.</p><footer>TJ Refrigeração · Assistência técnica</footer></main>\n\n</body></html>";
-self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
-self.addEventListener('activate',event=>event.waitUntil((async()=>{
-  const names=await caches.keys();
-  await Promise.all(names.filter(name=>name.startsWith('tj-refrigeracao')).map(name=>caches.delete(name)));
-  await self.clients.claim();
-  const windows=await self.clients.matchAll({type:'window'});
-  await Promise.all(windows.filter(client=>client.url.startsWith(self.registration.scope)).map(client=>client.navigate(self.registration.scope).catch(()=>{})));
-})()));
-self.addEventListener('fetch',event=>{
-  if(event.request.mode==='navigate'&&event.request.url.startsWith(self.registration.scope)){
-    event.respondWith(Promise.resolve(new Response(maintenance,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}})));
+const CACHE_NAME = 'tj-refrigeracao-pwa-v71-reativado';
+const APP_SHELL = [
+  './index.html',
+  './assets/tj-core.js',
+  './assets/tj-orcamento-equipamento.js', './assets/tj-equipamentos-grupo.js',
+  './assets/tj-pwa-update.js',
+  './assets/tj-orcamento-fluxo.js',
+  './assets/tj-orcamento-decisao.js',
+  './assets/tj-cadastros.js',
+  './assets/tj-atendimento.js',
+  './assets/tj-atendimento-pecas.js',
+  './assets/tj-deslocamento.js',
+  './assets/tj-media-config.js',
+  './assets/tj-chamado-media.js',
+  './assets/tj-recibos.js',
+  './assets/tj-layout.js', './assets/tj-realtime.js', './assets/tj-filtros.js', './assets/tj-equipamento-historico.js', './assets/tj-notificacoes-proprietario.js', './assets/tj-conta-topo.js', './assets/tj-preventiva.js', './assets/tj-relatorios.js', './assets/tj-historico-alteracoes.js', './assets/tj-garantias.js', './assets/vendor/jspdf-4.2.1.umd.min.js', './assets/tj-compartilhar.js', './assets/tj-pdf-visual.js', './assets/tj-retorno-garantia.js', './assets/tj-agenda-calendario.js', './assets/tj-estoque.js', './assets/tj-inicio-proprietario.js', './assets/tj-cliente-historico-completo.js', './assets/tj-orcamentos-privados.js',
+  './assets/tj-financeiro.js',
+  './assets/tj-cliente-acompanhamento.js',
+  './manifest.webmanifest',
+  './assets/tj-logo.png',
+  './assets/tj-watermark.png',
+  './assets/icon-192.png',
+  './assets/icon-512.png',
+  './assets/icon-maskable-192.png',
+  './assets/icon-maskable-512.png',
+  './assets/apple-touch-icon.png',
+  './assets/favicon-64.png'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL.map(path => new Request(path, {cache: 'reload'})))));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(key => key.startsWith('tj-refrigeracao-pwa-') && key !== CACHE_NAME)
+        .map(key => caches.delete(key))
+    )).then(async () => {
+      await self.clients.claim();
+      const windows = await self.clients.matchAll({type:'window'});
+      await Promise.all(windows.filter(client => client.url.startsWith(self.registration.scope)).map(client => client.navigate(client.url).catch(() => {})));
+    })
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const request=event.request, url=new URL(request.url);
+  if(request.method!=='GET'||url.origin!==self.location.origin)return;
+  const navigation=request.mode==='navigate';
+  const code=/\.(?:js|css)$/.test(url.pathname);
+  async function cached(){const cache=await caches.open(CACHE_NAME);return cache.match(navigation?'./index.html':request);}
+  async function fresh(){
+    const response=await fetch(request,{cache:'no-cache'});
+    if(response.ok){const cache=await caches.open(CACHE_NAME);await cache.put(navigation?'./index.html':request,response.clone());}
+    return response;
   }
+  event.respondWith((async()=>{
+    if(navigation||code){try{return await fresh();}catch(e){return await cached()||new Response('Sem conexão. Abra novamente quando estiver online.',{status:503});}}
+    return await cached()||fresh();
+  })());
 });
