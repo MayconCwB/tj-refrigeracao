@@ -2568,155 +2568,30 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
     var pedidoAtualNum = "PED-014";
 
     var state = {
-      perfilSessao: null,
-      configEmpresa: {
-        horario: "Seg a Sex — 08:00 às 18:00",
-        notIniciar: true,
-        notFinalizar: true,
-        notOrcamento: true
-      },
-      clientesCadastrados: [],
-      clientesFirebase: [],
-      agendamentos: [],
-      pedidos: [
-        {num:"PED-014", peca:"Compressor Tecumseh TCF", cliente:"Empresa XYZ", status:"Entregue", data:"25/09"},
-        {num:"PED-015", peca:"Termostato digital", cliente:"Bar do Zé", status:"A caminho", data:"29/09"},
-        {num:"PED-016", peca:"Borracha de porta", cliente:"Empresa XYZ", status:"Solicitado", data:"30/09"}
-      ],
-      chamados: [
-        {num:"00482", equip:"Câmara frigorífica", cliente:"Empresa XYZ", status:"Em atendimento", agend:"Hoje — 14:00"},
-        {num:"00479", equip:"Compressor", cliente:"Empresa XYZ", status:"Concluído", agend:"20/09 — 09:00"},
-        {num:"00451", equip:"Freezer industrial", cliente:"Empresa XYZ", status:"Aguardando aprovação", agend:""},
-        {num:"00468", equip:"Máquina de Gelo", cliente:"Bar do Zé", status:"Aguardando início", agend:"01/10 — 09:00"}
-      ],
-      mensagens: {
-        "00482": [
-          {autor:"cliente", texto:"Bom dia! A câmara não está gelando desde ontem.", hora:"10:20"},
-          {autor:"empresa", texto:"Bom dia, Thomas. Já recebemos o chamado, o técnico está a caminho.", hora:"13:50"}
-        ],
-        "00468": [],
-        "00451": [],
-        "00479": [
-          {autor:"cliente", texto:"Obrigado pelo atendimento!", hora:"16:10"}
-        ]
-      },
-      atendimentos: {
-        "00482": {
-          endereco: "Rua das Indústrias, 500 — Cozinha central",
-          previsao: "Hoje — 14:00",
-          diag: "Vazamento na linha de sucção detectado.",
-          pecas: [["Solda e pressurização", "1", "R$ 350,00"]]
-        },
-        "00468": {
-          endereco: "Av. Central, 1200 — Bar",
-          previsao: "01/10 — 09:00",
-          diag: "",
-          pecas: []
-        },
-        "00479": {
-          endereco: "Rua das Indústrias, 500 — Área técnica",
-          previsao: "20/09 — 09:00",
-          diag: "Substituição preventiva concluída com sucesso.",
-          pecas: [["Óleo lubrificante sintético", "2", "R$ 180,00"]]
-        },
-        "00451": {
-          endereco: "Rua das Indústrias, 500 — Estoque",
-          previsao: "",
-          diag: "",
-          pecas: []
-        }
-      },
-      orcamentos: [
-        {
-          num: "00231",
-          servico: "Manutenção de compressor",
-          cliente: "Empresa XYZ",
-          status: "Aguardando aprovação",
-          total: "R$ 2.850,00",
-          itens: [
-            ["Diagnóstico", "1", "R$ 300,00"],
-            ["Mão de obra", "1", "R$ 850,00"],
-            ["Compressor", "1", "R$ 1.700,00"]
-          ],
-          hist: [
-            ["28/09", "Orçamento emitido"],
-            ["29/09", "Enviado ao cliente"]
-          ]
-        },
-        {
-          num: "00227",
-          servico: "Troca de componente",
-          cliente: "Empresa XYZ",
-          status: "Aprovado",
-          total: "R$ 890,00",
-          itens: [
-            ["Componente eletrônico", "2", "R$ 395,00"]
-          ],
-          hist: [
-            ["18/09", "Orçamento emitido"],
-            ["24/09", "Aprovado pelo cliente"]
-          ]
-        },
-        {
-          num: "00219",
-          servico: "Manutenção preventiva",
-          cliente: "Empresa XYZ",
-          status: "Recusado",
-          total: "R$ 1.200,00",
-          itens: [
-            ["Manutenção preventiva (kit)", "1", "R$ 1.200,00"]
-          ],
-          hist: [
-            ["02/09", "Orçamento emitido"],
-            ["05/09", "Recusado pelo cliente"]
-          ]
-        }
-      ],
-      equip: [
-        {id:"e1", nome:"Câmara Frigorífica 1", marca:"Metalfrio", modelo:"VN50", sn:"55201", cliente:"Empresa XYZ", local:"Cozinha central", status:"Em manutenção", ncham:3},
-        {id:"e2", nome:"Compressor Principal", marca:"Tecumseh", modelo:"TCF", sn:"88412", cliente:"Empresa XYZ", local:"Área técnica", status:"Operando", ncham:5},
-        {id:"e3", nome:"Freezer Industrial 2", marca:"Gelopar", modelo:"GH100", sn:"31007", cliente:"Empresa XYZ", local:"Estoque", status:"Operando", ncham:2},
-        {id:"e4", nome:"Máquina de Gelo", marca:"Manitowoc", modelo:"IY0454", sn:"90214", cliente:"Bar do Zé", local:"Bar", status:"Parado", ncham:1}
-      ],
-      contatosCliente: [
-        {nome:"Thomas", cargo:"Sócio", tel:"(11) 99999-1000"},
-        {nome:"Ana", cargo:"Compras", tel:"(11) 99999-2000"}
-      ],
-      enderecosCliente: [
-        {apelido:"Matriz", tipo:"Fiscal", cep:"01001-000", rua:"Rua das Indústrias", num:"500", cidade:"São Paulo / SP"},
-        {apelido:"Filial Zona Norte", tipo:"Atendimento", cep:"02002-000", rua:"Av. Norte", num:"120", cidade:"São Paulo / SP"}
-      ],
-      contatosEmpresa: [
-        {nome:"TJ", cargo:"Proprietário / Técnico Chefe", tel:"(11) 98765-4321"},
-        {nome:"Central Técnica", cargo:"Plantão 24h", tel:"(11) 98765-0000"}
-      ],
-      enderecosEmpresa: [
-        {apelido:"Oficina Central", tipo:"Atendimento", cep:"03003-000", rua:"Rua dos Refrigeristas", num:"40", cidade:"São Paulo / SP"}
-      ],
-      historicoCliente: [
-        {data:"30/09", tipo:"atend", titulo:"Atendimento realizado — Câmara Frigorífica 1", desc:"Chamado #00482 — atendimento em andamento", status:"Em atendimento"},
-        {data:"29/09", tipo:"chamado", titulo:"Chamado #00482 aberto", desc:"Câmara frigorífica — problema relatado", status:"Aberto"},
-        {data:"28/09", tipo:"orcamento", titulo:"Orçamento #00231 emitido", desc:"Manutenção de compressor — R$ 2.850,00", status:"Aguardando aprovação"},
-        {data:"25/09", tipo:"orcamento", titulo:"Orçamento #00227 aprovado", desc:"Troca de componente — R$ 890,00", status:"Aprovado"},
-        {data:"20/09", tipo:"atend", titulo:"Atendimento concluído — Compressor", desc:"Chamado #00479 finalizado", status:"Concluído"},
-        {data:"12/09", tipo:"chamado", titulo:"Chamado #00451 aberto", desc:"Freezer industrial — aguardando aprovação", status:"Em análise"}
-      ],
-      historicoEmpresa: [
-        {data:"30/09", tipo:"atend", cliente:"Empresa XYZ", titulo:"Atendimento iniciado — Câmara Frigorífica 1", desc:"Chamado #00482", status:"Em atendimento"},
-        {data:"30/09", tipo:"chamado", cliente:"Bar do Zé", titulo:"Chamado #00468 aberto", desc:"Máquina de Gelo — aguardando início", status:"Aguardando início"},
-        {data:"29/09", tipo:"chamado", cliente:"Empresa XYZ", titulo:"Chamado #00482 aberto", desc:"Câmara frigorífica — problema relatado", status:"Aberto"},
-        {data:"28/09", tipo:"orcamento", cliente:"Empresa XYZ", titulo:"Orçamento #00231 emitido", desc:"Manutenção de compressor — R$ 2.850,00", status:"Aguardando aprovação"},
-        {data:"25/09", tipo:"orcamento", cliente:"Empresa XYZ", titulo:"Orçamento #00227 aprovado", desc:"Troca de componente — R$ 890,00", status:"Aprovado"},
-        {data:"20/09", tipo:"atend", cliente:"Empresa XYZ", titulo:"Atendimento concluído — Compressor", desc:"Chamado #00479 finalizado", status:"Concluído"},
-        {data:"12/09", tipo:"chamado", cliente:"Empresa XYZ", titulo:"Chamado #00451 aberto", desc:"Freezer industrial — aguardando aprovação", status:"Em análise"},
-        {data:"01/09", tipo:"equip", cliente:"Bar do Zé", titulo:"Equipamento cadastrado — Máquina de Gelo", desc:"Manitowoc IY0454 — S/N 90214", status:"Cadastrado"}
-      ],
-      notificacoesCliente: [
-        {data:"30/09", titulo:"Atendimento iniciado", desc:"O técnico iniciou o atendimento do chamado #00482.", lida:false},
-        {data:"29/09", titulo:"Orçamento disponível", desc:"O orçamento #00231 está aguardando sua aprovação.", lida:false},
-        {data:"25/09", titulo:"Orçamento aprovado", desc:"O orçamento #00227 foi aprovado.", lida:true}
-      ]
-    };
+  "perfilSessao": null,
+  "configEmpresa": {
+    "horario": "Seg a Sex — 08:00 às 18:00",
+    "notIniciar": true,
+    "notFinalizar": true,
+    "notOrcamento": true
+  },
+  "clientesCadastrados": [],
+  "clientesFirebase": [],
+  "agendamentos": [],
+  "pedidos": [],
+  "chamados": [],
+  "mensagens": {},
+  "atendimentos": {},
+  "orcamentos": [],
+  "equip": [],
+  "contatosCliente": [],
+  "enderecosCliente": [],
+  "contatosEmpresa": [],
+  "enderecosEmpresa": [],
+  "historicoCliente": [],
+  "historicoEmpresa": [],
+  "notificacoesCliente": []
+};
 
     // TOAST
     var toastTimeout = null;
