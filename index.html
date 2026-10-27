@@ -1530,7 +1530,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">E-mail</label>
-                <input type="email" id="cli-perfil-email" class="form-input" value="">
+                <input type="email" id="cli-perfil-email" class="form-input" value="" readonly>
               </div>
               <div class="form-group">
                 <label class="form-label">Telefone</label>
@@ -1539,7 +1539,7 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
             </div>
             <div class="form-group">
               <label class="form-label">CNPJ</label>
-              <input type="text" id="cli-perfil-cnpj" class="form-input" value="Complete depois">
+              <input type="text" id="cli-perfil-cnpj" class="form-input" value="" placeholder="Não informado" readonly>
             </div>
             <button type="button" class="btn-tj" data-action="salvar-dados-cli">Salvar Dados Cadastrais</button>
           </div>
@@ -2110,26 +2110,26 @@ html[data-theme="dark"] #det-orc-total{color:#7DD3FC!important}
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Razão Social</label>
-                <input type="text" class="form-input" value="TJ Refrigeração Industrial Ltda.">
+                <input type="text" id="emp-perfil-empresa" class="form-input" value="" maxlength="200">
               </div>
               <div class="form-group">
-                <label class="form-label">Responsável Técnico</label>
-                <input type="text" class="form-input" value="TJ — Proprietário">
+                <label class="form-label" for="emp-perfil-nome">Nome do proprietário / responsável técnico</label>
+                <input type="text" id="emp-perfil-nome" class="form-input" value="" placeholder="Como você quer ser chamado" maxlength="200">
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">E-mail de Contato</label>
-                <input type="email" class="form-input" value="contato@tjrefrigeracao.com.br">
+                <label class="form-label">E-mail de acesso</label>
+                <input type="email" id="emp-perfil-email" class="form-input" value="" readonly>
               </div>
               <div class="form-group">
                 <label class="form-label">Telefone Comercial / Plantão</label>
-                <input type="text" class="form-input" value="(11) 98765-4321">
+                <input type="text" id="emp-perfil-tel" class="form-input" value="">
               </div>
             </div>
             <div class="form-group">
               <label class="form-label">CNPJ</label>
-              <input type="text" class="form-input" value="12.345.678/0001-90">
+              <input type="text" id="emp-perfil-cnpj" class="form-input" value="49.102.762/0001-98" readonly>
             </div>
             <button type="button" class="btn-tj" data-action="salvar-dados-emp">Salvar Alterações</button>
           </div>
@@ -6976,9 +6976,10 @@ function atualizarIdentidadeCliente(perfil){
 
 function atualizarIdentidadeEmpresa(perfil){
   perfil=perfil||{};
-  var nome=perfil.nome||perfil.empresa||perfil.razaoSocial||"Proprietário";
+  var nome=window.TJProfile?window.TJProfile.name(perfil):perfil.nome||perfil.empresa||perfil.razaoSocial||"Proprietário";
   var saudacao=document.getElementById("emp-saudacao");
   if(saudacao) saudacao.textContent="Olá, "+nome+" 👋";
+  window.dispatchEvent(new Event("tj-profile-changed"));
 }
 
 function telaApp(tipo){
