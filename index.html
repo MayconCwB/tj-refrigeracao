@@ -7869,32 +7869,52 @@ function renderClientesAdmin(){
 renderizarClientesEmpresa=async function(){await carregarClientesEmpresaFirebase();renderClientesAdmin();};
 function abrirEditarCliente(uid){var c=clientePorUid(uid);if(!c)return;$v('emp-cli-uid').value=uid;$v('emp-cli-form-titulo').textContent='Editar Cliente';$v('emp-cli-form-subtitulo').textContent='Altere os dados cadastrais do cliente. O e-mail de acesso não é alterado por segurança.';$v('emp-cli-tipo').value=c.tipo;$v('emp-cli-nome').value=c.nome;$v('emp-cli-tel').value=c.tel==='Não informado'?'':c.tel;$v('emp-cli-email').value=c.email;$v('emp-cli-email').readOnly=true;$v('btn-salvar-cliente-empresa').textContent='SALVAR ALTERAÇÕES';abrirTela('tela-emp-novo-cliente');}
 async function salvarEdicaoCliente(){var uid=$v('emp-cli-uid').value;if(!uid)return false;var tipo=$v('emp-cli-tipo').value,nome=$v('emp-cli-nome').value.trim(),tel=$v('emp-cli-tel').value.trim();if(!nome||!tel){avisoV13('Preencha nome e telefone.');return true;}if(!window.TJTelefoneValido(tel)){avisoV13(window.TJTelefoneMensagem);return true;}await Promise.all([window.TJFB.db.collection('clients').doc(uid).set({nome:nome,telefone:tel,tipoPessoa:tipo,atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),window.TJFB.db.collection('users').doc(uid).set({nome:nome,tipoPessoa:tipo,atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})]);await recarregarV13();avisoV13('Cliente atualizado.');abrirTela('tela-emp-clientes');return true;}
+const exclusoesClienteEmAndamento=new Set();
 async function excluirClienteAdmin(uid){
   if(!ownerOk())return avisoV13('Acesso restrito ao proprietário.');
-  var c=clientePorUid(uid);
-  if(!c)return avisoV13('Cliente não encontrado.');
-  var msg='Excluir o cliente “'+c.nome+'”?\n\nSerão removidos os dados operacionais dele (chamados, equipamentos, orçamentos, pedidos, histórico e agendamentos). O acesso do cliente ao portal ficará desativado.';
+  const fb=window.TJFB, actor=fb.auth.currentUser.uid;
+  if(!uid||uid===actor)return avisoV13('A conta do proprietário não pode ser excluída.');
+  const cliente=clientePorUid(uid);
+  if(!cliente)return avisoV13('Cliente não encontrado.');
+  if(exclusoesClienteEmAndamento.has(uid))return;
+  const msg='Excluir o cliente “'+cliente.nome+'”?\n\nChamados, equipamentos, orçamentos, pedidos, agendamentos, preventivas e solicitações serão removidos. O acesso será desativado. Recibos emitidos e movimentações de estoque serão preservados.';
   if(!window.confirm(msg))return;
-  var dbv=window.TJFB.db, batch=dbv.batch();
-  var refCli=dbv.collection('clients').doc(uid);
-  var refData=dbv.collection('clientData').doc(uid);
-  var refUser=dbv.collection('users').doc(uid);
-  batch.delete(refCli);
-  batch.delete(refData);batch.delete(dbv.collection('orcamentosProprietario').doc(uid));
-  batch.set(refUser,{
-    role:'cliente',
-    active:false,
-    nome:c.nome||'Cliente',
-    email:c.email||'',
-    excluidoPor:'proprietario',
-    excluidoEm:firebase.firestore.FieldValue.serverTimestamp()
-  },{merge:true});
-  await batch.commit();
-  if(clienteAtualUid===uid){clienteAtualUid='';clienteAtualNome='';}
-  await recarregarV13();
-  await carregarClientesEmpresaFirebase();
-  abrirTela('tela-emp-clientes');
-  avisoV13('Cliente excluído e acesso desativado.');
+  exclusoesClienteEmAndamento.add(uid);
+  try{
+    const dbv=fb.db, userRef=dbv.collection('users').doc(uid);
+    const [perfil,...vinculos]=await Promise.all([
+      userRef.get({source:'server'}),
+      ...['manutencoesPreventivas','solicitacoesOrcamento','vinculosFinanceiros'].map(nome=>
+        dbv.collection(nome).where('clienteUid','==',uid).get({source:'server'})
+      )
+    ]);
+    if(!ownerOk()||fb.auth.currentUser.uid!==actor)throw Error('Sua sessão mudou. Entre novamente.');
+    if(!perfil.exists||perfil.data().role!=='cliente')throw Error('A conta selecionada não é um cliente válido.');
+    const relacionados=vinculos.flatMap(snap=>snap.docs);
+    if(relacionados.some(doc=>doc.data().clienteUid!==uid))throw Error('Não foi possível confirmar os vínculos deste cliente.');
+    if(relacionados.length>496)throw Error('Este cliente tem muitos registros vinculados para uma exclusão única. Nada foi removido.');
+    const batch=dbv.batch();
+    batch.delete(dbv.collection('clients').doc(uid));
+    batch.delete(dbv.collection('clientData').doc(uid));
+    batch.delete(dbv.collection('orcamentosProprietario').doc(uid));
+    relacionados.forEach(doc=>batch.delete(doc.ref));
+    batch.update(userRef,{
+      active:false,
+      excluidoPor:'proprietario',
+      excluidoEm:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await batch.commit();
+    if(fb.auth.currentUser?.uid!==actor)return;
+    if(clienteAtualUid===uid){clienteAtualUid='';clienteAtualNome='';}
+    try{
+      await recarregarV13();
+      await carregarClientesEmpresaFirebase();
+      abrirTela('tela-emp-clientes');
+      avisoV13('Cliente excluído, vínculos operacionais removidos e acesso desativado.');
+    }catch(e){
+      avisoV13('Cliente excluído. Atualize a lista para ver a mudança.');
+    }
+  }finally{exclusoesClienteEmAndamento.delete(uid);}
 }
 function resetFormCliente(){if($v('emp-cli-uid'))$v('emp-cli-uid').value='';if($v('emp-cli-form-titulo'))$v('emp-cli-form-titulo').textContent='Cadastrar Cliente';if($v('emp-cli-form-subtitulo'))$v('emp-cli-form-subtitulo').textContent='Crie o acesso do cliente. Ele receberá um e-mail para definir a própria senha.';if($v('emp-cli-email'))$v('emp-cli-email').readOnly=false;if($v('btn-salvar-cliente-empresa'))$v('btn-salvar-cliente-empresa').textContent='CADASTRAR CLIENTE';}
 
